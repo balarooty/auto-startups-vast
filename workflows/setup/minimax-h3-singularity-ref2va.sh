@@ -150,16 +150,25 @@ install_node Comfyui_Minimax_h3_latent_Upscaler   https://github.com/LBH-123-AI/
 # working v2, the node hard-fails at queue time:
 #   RuntimeError: sageattention is not new enough version or could not determine
 #   CUDA architecture, cannot apply MiniMax H3 Memory Efficient Sage Attention Patch.
-# So we UPGRADE to v2.0.1 from GitHub (compiles CUDA kernels; needs
-# --no-build-isolation so setup.py sees torch already in the venv).
+# So we install v2.2.0 via the prebuilt Linux wheel (snw35/sageattention-wheel;
+# built for cu13/cp312, no compile needed). If the wheel profile doesn't match
+# this box, fall back to building v2.0.1 from GitHub (needs --no-build-isolation
+# so setup.py sees torch already in the venv; pin TORCH_CUDA_ARCH_LIST to the
+# GPU so nvcc doesn't try a wrong/failed arch).
 if "$COMFYUI_PYTHON" -c "from sageattention.core import get_cuda_arch_versions" >/dev/null 2>&1; then
   echo "  ✅ sageattention v2 API (get_cuda_arch_versions) present"
 else
   echo "  ⚠️  sageattention missing or is stale v1 (PyPI 1.0.6 lacks get_cuda_arch_versions) —"
   echo "      this would break the 'MiniMax H3 Mem Eff Sage Attention Patch' node."
-  echo "  📥 Installing SageAttention v2.0.1 from GitHub (compiles CUDA kernels)..."
-  "$COMFYUI_PIP" install --no-cache-dir --no-build-isolation \
-    'git+https://github.com/thu-ml/SageAttention.git@v2.0.1' 2>&1 | tail -5
+  echo "  📥 Installing SageAttention v2.2.0 prebuilt wheel (cu13/cp312)..."
+  WHEEL_URL="https://github.com/snw35/sageattention-wheel/releases/download/cu12-2.2.0-cu13-2.2.0/sageattention-2.2.0%2Bcu13-cp312-cp312-linux_x86_64.whl"
+  if ! "$COMFYUI_PIP" install --no-cache-dir "$WHEEL_URL" 2>&1 | tail -3; then
+    echo "  ⚠️  Wheel install failed — falling back to building v2.0.1 from GitHub..."
+    ARCHS="$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1 | tr -d ' .' | sed 's/^/sm/')"
+    [ -n "$ARCHS" ] && export TORCH_CUDA_ARCH_LIST="$ARCHS"
+    "$COMFYUI_PIP" install --no-cache-dir --no-build-isolation \
+      'git+https://github.com/thu-ml/SageAttention.git@v2.0.1' 2>&1 | tail -5
+  fi
   if "$COMFYUI_PYTHON" -c "from sageattention.core import get_cuda_arch_versions" >/dev/null 2>&1; then
     echo "  ✅ SageAttention v2 installed with get_cuda_arch_versions"
     NODES_INSTALLED=$((NODES_INSTALLED + 1))
@@ -167,6 +176,23 @@ else
     echo "  ⚠️  Could not install SageAttention v2 — the patch node will fail; you can"
     echo "      bypass it in the UI (it is a VRAM optimisation, not a requirement)."
   fi
+fi
+
+# ─── Comfy model compiler fix ──────────────────────────────────────────────
+# This ComfyUI build enables a torch.compile "model compiler" (+ CUDA graphs) by
+# default. It traces the model with fake/CPU tensors, and the SageAttention
+# int8 kernel rejects CPU input:
+#   RuntimeError: Tensor query must be on CUDA   (SamplerCustomAdvanced)
+# The clean fix is `--disable-comfy-compiler` (it also disables CUDA graphs).
+# Vast's template injects COMFYUI_ARGS from /etc/environment which OVERRIDES the
+# default in /opt/supervisor-scripts/comfyui.sh, so append the flag to the
+# launch line, not the default. Dynamic VRAM is a separate feature and stays on.
+if [ -f /opt/supervisor-scripts/comfyui.sh ] && \
+   ! grep -q -- '--disable-comfy-compiler' /opt/supervisor-scripts/comfyui.sh; then
+  echo "  📥 Adding --disable-comfy-compiler to the supervisor launch line..."
+  sed -i 's#${COMFYUI_ARGS} 2>&1#${COMFYUI_ARGS} --disable-comfy-compiler 2\&1#' \
+    /opt/supervisor-scripts/comfyui.sh || true
+  NODES_INSTALLED=$((NODES_INSTALLED + 1))
 fi
 
 # ─── Phase 2: Models ─────────────────────────────────────────────────────────

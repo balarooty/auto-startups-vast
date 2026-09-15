@@ -103,16 +103,36 @@ done
 # which only exists in SageAttention v2 (git tags v2.0.1/v2.2.0). PyPI
 # 'latest' is 1.0.6, which lacks it — the node hard-fails at queue time with
 # "sageattention is not new enough version or could not determine CUDA
-# architecture". Upgrade to v2.0.1 from GitHub if the v2 API is absent.
+# architecture". Install v2.2.0 via the prebuilt Linux wheel (snw35, cu13/cp312,
+# no compile) and fall back to building v2.0.1 from GitHub if needed.
 if $COMFY_PYTHON -c "from sageattention.core import get_cuda_arch_versions" >/dev/null 2>&1; then
     echo "  ✅ sageattention v2 API (get_cuda_arch_versions) present"
 else
-    echo "  ⚠️  sageattention missing or stale v1 (lacks get_cuda_arch_versions) — upgrading to v2.0.1..."
-    $COMFY_PIP install --no-cache-dir --no-build-isolation \
-        'git+https://github.com/thu-ml/SageAttention.git@v2.0.1' 2>&1 | tail -5 || true
+    echo "  ⚠️  sageattention missing or stale v1 (lacks get_cuda_arch_versions) — installing v2.2.0 prebuilt wheel..."
+    WHEEL_URL="https://github.com/snw35/sageattention-wheel/releases/download/cu12-2.2.0-cu13-2.2.0/sageattention-2.2.0%2Bcu13-cp312-cp312-linux_x86_64.whl"
+    if ! $COMFY_PIP install --no-cache-dir "$WHEEL_URL" 2>&1 | tail -3; then
+        echo "  ⚠️  Wheel install failed — building v2.0.1 from GitHub..."
+        ARCHS="$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1 | tr -d ' .' | sed 's/^/sm/')"
+        [ -n "$ARCHS" ] && export TORCH_CUDA_ARCH_LIST="$ARCHS"
+        $COMFY_PIP install --no-cache-dir --no-build-isolation \
+            'git+https://github.com/thu-ml/SageAttention.git@v2.0.1' 2>&1 | tail -5 || true
+    fi
     $COMFY_PYTHON -c "from sageattention.core import get_cuda_arch_versions" >/dev/null 2>&1 \
         && echo "  ✅ SageAttention v2 installed" \
         || echo "  ⚠️  SageAttention v2 install failed — bypass the patch node in the UI (VRAM opt, not required)."
+fi
+
+# ── Comfy model compiler fix ──
+# ComfyUI's torch.compile "model compiler" (on by default in this build, incl.
+# CUDA graphs) traces the MiniMax H3 model with fake/CPU tensors, so the
+# SageAttention int8 kernel dies with "RuntimeError: Tensor query must be on
+# CUDA" in SamplerCustomAdvanced. Append --disable-comfy-compiler to the
+# supervisor launch line (Vast injects COMFYUI_ARGS overriding the default).
+if [ -f /opt/supervisor-scripts/comfyui.sh ] && \
+   ! grep -q -- '--disable-comfy-compiler' /opt/supervisor-scripts/comfyui.sh; then
+    echo "  📥 Adding --disable-comfy-compiler to the supervisor launch line..."
+    sed -i 's#${COMFYUI_ARGS} 2>&1#${COMFYUI_ARGS} --disable-comfy-compiler 2\&1#' \
+        /opt/supervisor-scripts/comfyui.sh || true
 fi
 
 # ── Phase 1b: MiniMax_H3_Semantic_Bridge custom node (zip node, no pip deps) ──
