@@ -144,14 +144,29 @@ install_node ComfyUI-Easy-Use                     https://github.com/yolain/Comf
 install_node Comfyui_Minimax_h3_latent_Upscaler   https://github.com/LBH-123-AI/Comfyui_Minimax_h3_latent_Upscaler.git
 
 # KJNodes' MiniMaxH3MemoryEfficientSageAttentionPatch needs SageAttention at
-# runtime. It is NOT installed by default and the node hard-fails without it
-# (RuntimeError: sageattention is not new enough version or could not determine
-# version). Detect and tell the user rather than silently shipping a broken graph.
-if ! "$COMFYUI_PYTHON" -c "import sageattention" >/dev/null 2>&1; then
-  echo "  ⚠️  sageattention is NOT installed — the workflow's"
-  echo "      'MiniMax H3 Mem Eff Sage Attention Patch' node will fail until you either"
-  echo "      run: $COMFYUI_PIP install sageattention"
-  echo "      or bypass that node in the UI (it is a VRAM optimisation, not a requirement)."
+# runtime. The PyPI 'latest' (1.0.6) is STALE — KJNodes imports
+# `get_cuda_arch_versions()` from sageattention.core, which only exists in
+# SageAttention v2 (git tags v2.0.1/v2.2.0; PyPI 1.0.6 lacks it). Without a
+# working v2, the node hard-fails at queue time:
+#   RuntimeError: sageattention is not new enough version or could not determine
+#   CUDA architecture, cannot apply MiniMax H3 Memory Efficient Sage Attention Patch.
+# So we UPGRADE to v2.0.1 from GitHub (compiles CUDA kernels; needs
+# --no-build-isolation so setup.py sees torch already in the venv).
+if "$COMFYUI_PYTHON" -c "from sageattention.core import get_cuda_arch_versions" >/dev/null 2>&1; then
+  echo "  ✅ sageattention v2 API (get_cuda_arch_versions) present"
+else
+  echo "  ⚠️  sageattention missing or is stale v1 (PyPI 1.0.6 lacks get_cuda_arch_versions) —"
+  echo "      this would break the 'MiniMax H3 Mem Eff Sage Attention Patch' node."
+  echo "  📥 Installing SageAttention v2.0.1 from GitHub (compiles CUDA kernels)..."
+  "$COMFYUI_PIP" install --no-cache-dir --no-build-isolation \
+    'git+https://github.com/thu-ml/SageAttention.git@v2.0.1' 2>&1 | tail -5
+  if "$COMFYUI_PYTHON" -c "from sageattention.core import get_cuda_arch_versions" >/dev/null 2>&1; then
+    echo "  ✅ SageAttention v2 installed with get_cuda_arch_versions"
+    NODES_INSTALLED=$((NODES_INSTALLED + 1))
+  else
+    echo "  ⚠️  Could not install SageAttention v2 — the patch node will fail; you can"
+    echo "      bypass it in the UI (it is a VRAM optimisation, not a requirement)."
+  fi
 fi
 
 # ─── Phase 2: Models ─────────────────────────────────────────────────────────

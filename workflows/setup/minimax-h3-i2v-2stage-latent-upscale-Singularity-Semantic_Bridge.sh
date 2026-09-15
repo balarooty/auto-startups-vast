@@ -98,6 +98,23 @@ for repo in ComfyUI-KJNodes comfyui-minimax-h3-audio-T8 Comfyui_Minimax_h3_laten
     fi
 done
 
+# ── SageAttention v2 (fixes MiniMaxH3MemoryEfficientSageAttentionPatch) ──
+# KJNodes' H3 patch imports `get_cuda_arch_versions` from sageattention.core,
+# which only exists in SageAttention v2 (git tags v2.0.1/v2.2.0). PyPI
+# 'latest' is 1.0.6, which lacks it — the node hard-fails at queue time with
+# "sageattention is not new enough version or could not determine CUDA
+# architecture". Upgrade to v2.0.1 from GitHub if the v2 API is absent.
+if $COMFY_PYTHON -c "from sageattention.core import get_cuda_arch_versions" >/dev/null 2>&1; then
+    echo "  ✅ sageattention v2 API (get_cuda_arch_versions) present"
+else
+    echo "  ⚠️  sageattention missing or stale v1 (lacks get_cuda_arch_versions) — upgrading to v2.0.1..."
+    $COMFY_PIP install --no-cache-dir --no-build-isolation \
+        'git+https://github.com/thu-ml/SageAttention.git@v2.0.1' 2>&1 | tail -5 || true
+    $COMFY_PYTHON -c "from sageattention.core import get_cuda_arch_versions" >/dev/null 2>&1 \
+        && echo "  ✅ SageAttention v2 installed" \
+        || echo "  ⚠️  SageAttention v2 install failed — bypass the patch node in the UI (VRAM opt, not required)."
+fi
+
 # ── Phase 1b: MiniMax_H3_Semantic_Bridge custom node (zip node, no pip deps) ──
 echo "==> Installing MiniMax_H3_Semantic_Bridge custom node..."
 mkdir -p "$CUSTOM_NODES_DIR"
