@@ -1,0 +1,31 @@
+# https://docs.devin.ai/onboard-devin/environment-yaml
+# Commands run from the repo root.
+# One-time setup (tools + envs; idempotent).
+initialize:
+  - name: install miniconda + uv
+    run: |
+      if [ ! -x /home/ubuntu/miniconda3/bin/conda ]; then
+        curl -sL -o /tmp/miniconda.sh https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+        bash /tmp/miniconda.sh -b -p /home/ubuntu/miniconda3
+      fi
+      /home/ubuntu/miniconda3/bin/conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main || true
+      /home/ubuntu/miniconda3/bin/conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r || true
+      curl -LsSf https://astral.sh/uv/install.sh | sh
+  - name: story-v5 conda env
+    run: |
+      /home/ubuntu/miniconda3/bin/conda create -y -p /home/ubuntu/.conda-envs/story-v5 python=3.11 || true
+# Dependency installs (incremental, surfaced to the agent at session start).
+maintenance: |
+  /home/ubuntu/.local/bin/uv pip install --python /home/ubuntu/.conda-envs/story-v5/bin/python -r skills/story-maker-v5-mastra/requirements.txt pytest
+  (cd skills/story-maker-v5-mastra && npm install)
+# Reference info for agent
+knowledge:
+  - name: test
+    contents: |
+      # python skill tests: /home/ubuntu/.conda-envs/story-v5/bin/python -m pytest skills/<skill>/tests/
+      # mastra typecheck: (cd skills/story-maker-v5-mastra && npx tsc --noEmit)
+  - name: notes
+    contents: |
+      # Node via nvm (v24): export NVM_DIR=$HOME/.nvm && source $NVM_DIR/nvm.sh
+      # Repo rule: use miniconda envs + uv for Python.
+      # Mastra service: (cd skills/story-maker-v5-mastra && npm run dev) — API on :4111
