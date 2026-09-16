@@ -1,0 +1,30 @@
+{
+  "name": "story-maker-v5-mastra",
+  "version": "5.1.0",
+  "private": true,
+  "description": "Standalone Mastra service version of story-maker-v5: story-to-video pipeline as a typed workflow with enforced human gates.",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "dev": "mastra dev",
+    "build": "mastra build",
+    "start": "node .mastra/output/index.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "4.0.50",
+    "@ai-sdk/openai": "4.0.62",
+    "@mastra/core": "1.65.0",
+    "@mastra/libsql": "1.22.3",
+    "ai": "7.0.94",
+    "dotenv": "16.4.5",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "mastra": "1.28.0",
+    "typescript": "^5.9.0"
+  }
+}
