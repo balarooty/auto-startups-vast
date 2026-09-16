@@ -2,14 +2,25 @@ import fs from "node:fs";
 import path from "node:path";
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
-import { REPO_ROOT, SKILL_ROOT } from "../config.js";
+import { env, REPO_ROOT, SKILL_ROOT } from "../config.js";
 
 // Agents may read anything under the skill dir (prompts/assets) or the repo's
-// stories/ and outputs/ trees. Writes are limited to outputs/ run dirs.
+// stories/ and outputs/ trees. Writes are limited to the configured outputs
+// root (run dirs) — which lives under the skill dir by default.
+const READ_ROOTS = [
+  SKILL_ROOT,
+  path.join(REPO_ROOT, "stories"),
+  path.join(REPO_ROOT, "outputs"),
+];
+const WRITE_ROOTS = [env.outputsRoot, path.join(REPO_ROOT, "outputs")];
+
+function under(abs: string, roots: string[]): boolean {
+  return roots.some((root) => abs === root || abs.startsWith(root + path.sep));
+}
+
 function resolveRead(p: string): string {
   const abs = path.resolve(SKILL_ROOT, p);
-  const allowed = [SKILL_ROOT, path.join(REPO_ROOT, "stories"), path.join(REPO_ROOT, "outputs")];
-  if (!allowed.some((root) => abs === root || abs.startsWith(root + path.sep))) {
+  if (!under(abs, READ_ROOTS)) {
     throw new Error(`read_file: path outside allowed roots: ${abs}`);
   }
   return abs;
@@ -17,9 +28,8 @@ function resolveRead(p: string): string {
 
 function resolveWrite(p: string): string {
   const abs = path.resolve(SKILL_ROOT, p);
-  const root = path.join(REPO_ROOT, "outputs");
-  if (!(abs === root || abs.startsWith(root + path.sep))) {
-    throw new Error(`write_file: only outputs/ paths are writable: ${abs}`);
+  if (!under(abs, WRITE_ROOTS)) {
+    throw new Error(`write_file: only ${env.outputsRoot} paths are writable: ${abs}`);
   }
   return abs;
 }

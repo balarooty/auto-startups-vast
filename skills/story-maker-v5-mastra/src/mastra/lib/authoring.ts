@@ -42,12 +42,24 @@ const MIME: Record<string, string> = {
   ".jpeg": "image/jpeg",
 };
 
+/** Resume waterfall: an existing artifact with a passing .validation.json
+ * is already authored — skip it, matching the runbook's "continue from the
+ * first missing one" rule. */
+async function alreadyValid(job: { artifactPath: string; schema: string; validateArgs?: string[] }): Promise<AuthorResult | null> {
+  if (!fs.existsSync(job.artifactPath)) return null;
+  const v = await validateArtifact(job.artifactPath, job.schema, job.validateArgs ?? []);
+  if (!v.ok) return null;
+  return { artifactPath: job.artifactPath, ok: true, attempts: 0, errors: [], warnings: v.warnings };
+}
+
 /**
  * The write → validate → fix loop that the SKILL.md runbook performs by hand:
  * generate the artifact, write it, run the deterministic validator, feed the
  * errors back, retry until ok:true (or attempts exhausted).
  */
 export async function authorArtifact(agent: Agent, job: AuthorJob): Promise<AuthorResult> {
+  const cached = await alreadyValid(job);
+  if (cached) return cached;
   const maxAttempts = job.maxAttempts ?? env.maxAuthoringAttempts;
   fs.mkdirSync(path.dirname(job.artifactPath), { recursive: true });
 
@@ -121,6 +133,9 @@ export interface MultiFileJob {
  * writes via write_file; the step only re-validates and feeds errors back.
  */
 export async function authorFileSet(agent: Agent, job: MultiFileJob): Promise<{ ok: boolean; errors: string[] }> {
+  // Same resume rule: if the file set already validates, don't re-author.
+  const existing = await job.validate();
+  if (existing.ok) return { ok: true, errors: [] };
   const maxAttempts = job.maxAttempts ?? env.maxAuthoringAttempts;
   const messages: Array<{ role: "user" | "assistant"; content: string }> = [
     { role: "user", content: job.task + contextBlock(job.contextFiles ?? []) },

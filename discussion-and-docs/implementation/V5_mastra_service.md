@@ -53,8 +53,22 @@ skill at `skills/story-maker-v5/` is untouched — the variant is a copy at
   suspend/resume schemas present).
 - `POST /api/workflows/episode/start-async` executes `intake` end-to-end —
   `prepare_episode.py` runs and fails correctly on a missing story folder.
-- Not yet exercised: any step needing an LLM key (no provider key on the
-  build machine), image spend, and the render handoff.
+- Live `plan`-mode run on OpenRouter `deepseek/deepseek-v4.1-flash`
+  (2026-09-16): intake → Stage A (all 5 artifacts + 8 image-prompt files,
+  validators ok) → GATE 0 critique (valid report on attempt 3 —
+  write→validate→fix loop corrected a narration preamble, then a summary
+  count mismatch) → early return on `mode: "plan"`. Run: success.
+- Resume waterfall verified: re-running the episode skips already-valid
+  artifacts (`alreadyValid` in `src/mastra/lib/authoring.ts`), matching the
+  runbook's "continue from the first missing artifact" rule.
+- Fixes landed during live testing: `write_file` now permits the configured
+  `OUTPUTS_ROOT` (run dirs live under the skill dir, not `REPO_ROOT/outputs`);
+  `PYTHON_BIN` must point at the env with requirements installed (prompt
+  validators import `httpx`/`fal_client`); OpenRouter needs the full
+  `openrouter/<vendor>/<model>` id — a bare `deepseek/...` resolves to the
+  DeepSeek API provider.
+- Not yet exercised: GATE 1/2 suspend→resume, image spend, and the render
+  handoff.
 
 ## Notable risks
 

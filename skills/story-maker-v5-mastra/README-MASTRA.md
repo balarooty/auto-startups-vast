@@ -28,6 +28,8 @@ cd skills/story-maker-v5-mastra
 pip install -r requirements.txt          # python hands (same as v5)
 npm install                              # node orchestrator
 cp mastra.env.example .env               # LLM_* config
+# set PYTHON_BIN to the env you pip-installed into — the prompt/image
+# validators import httpx, fal_client, etc. which system python3 lacks.
 # repo-root .env still needs FAL_KEY / REPLICATE_API_TOKEN / COMFYUI_URL(+AUTH)
 ```
 
