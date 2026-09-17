@@ -278,6 +278,11 @@ not re-author or re-generate anything.
    (reference priority, spatial continuity, action contract: visible pose, plain prose reading order)
 4b. critique_report.md                 (Claude)             — Agent 6  → validate --schema critique
    (directing questions evaluated with severity tiers: BLOCKER, MAJOR, MINOR, NOT_APPLICABLE)
+4c. directorial_breakdown.md           (Python)             — directorial_breakdown.py
+   (human-readable director's breakdown assembled deterministically from
+   story.json + beat_board + scenes + storyboards: directorial intent, arc
+   table, color script, asset manifest with state_changes, shot-by-shot
+   table with 4-stem audio — the GATE 0 review document)
    ═══ GATE 0: critique must pass with zero BLOCKERs and all MAJORs disposed before image generation ═══
 5. assets/characters/*.png             (Python T2I, once, 4K) — build_images.py --assets-only
    assets/locations/*.png              (Python T2I, once, 4K wide-angle 360°)
@@ -318,8 +323,10 @@ enforcement. You (Claude) must stop and ask the user before proceeding.
 ```
 Stage A: Author all storyboards for all scenes (A1-A4 per scene) + story.json
 Stage A-QA: Critique agent evaluates the full plan against directing questions (with Severity Tiers)
+           + directorial_breakdown.py assembles the readable review document
   ═══ GATE 0 ═══
   STOP. The critique report must have zero BLOCKERs and all MAJORs disposed before any image generation.
+  Read directorial_breakdown.md to review intent, arc, palette, and the shot table as one document.
   Fix flagged artifacts or confirm director disposition until all questions pass.
 Stage B: Generate assets + storyboard sheets (Python T2I, once per story + per scene)
 Stage B-QA: Spatial QA inspects sheets against spatial plans (Agent 7, PASS/WARN/BLOCKER)

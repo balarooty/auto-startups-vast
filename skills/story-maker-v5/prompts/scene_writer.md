@@ -44,6 +44,11 @@ summary should reflect the screenplay's action lines, not paraphrase them.
   links the scene and evolves with emotion.
 - **Sound world.** `sound_world` names the recurring ambience/foley/score texture;
   H3 invents audio when it is not directed.
+- **Color script.** `color_script` carries this scene's palette from the
+  screenplay's `## Color Script` — one line mapping color to emotion
+  (e.g. `sun-drenched golds and greens — warmth, safety, play`). Optional but
+  encouraged; the validator warns when missing. Agents 4–5 echo it into
+  sheet prompts and video prompts so the palette actually reaches the images.
 - **Target per scene.** Each scene's `target_seconds` must be an integer in the
   ~60-80s band. The sum of all scene `target_seconds` must be within 15% of the run
   target (the validator enforces this — pick per-scene budgets that sum to target).
@@ -76,6 +81,7 @@ acting_beat: proud stillness → startled lurch → wide-eyed wonder
 layout_strategy: boulder and basket foreground-right, pond opening midground-left, eye path follows the basket's fall into the water
 visual_motif: round openings — basket mouth, cylinder rim, pond surface — each a portal that grows in meaning
 sound_world: meadow birds, gentle water lap, whimsical acoustic strings
+color_script: sun-drenched meadow golds and greens — warmth, safety, play
 beat: A spilled basket reveals an underwater world to a young inventor.
 
 ## Scene s2 — The Underwater World

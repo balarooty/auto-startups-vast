@@ -140,9 +140,14 @@ Validator expectations that matter here:
 
 ### 5. `overall_soundscape:`
 - Diegetic ambience, room tone, and physical foley across the full 15 seconds.
+- **Harvest the storyboard's audio stems**: `audio_amb:` and `audio_fx:`
+  per shot feed this section directly — consolidate them across the
+  generation's shots into one coherent diegetic layer. `audio_dia:` informs
+  vocal texture already covered by inline dialogue; `audio_mus:` feeds
+  `non_diegetic_music:` instead — never leak score terms in here.
 - **Harvest Screenplay Sound Cues**: Scan `developed_story.md` action lines for ALL-CAPS sound cues (`SNAP!`, `POP`, `CREAK`, `WHUMP`, `SPLASH`) and incorporate them directly.
 - Do not repeat spoken dialogue or non-diegetic score terms here.
 
 ### 6. `non_diegetic_music:`
-- Score the characters cannot hear. Describe instrumentation, tempo, rhythm, and dynamics (e.g. `Low cello drone with rising Vedic chants and subtle string swells`).
+- Score the characters cannot hear. Describe instrumentation, tempo, rhythm, and dynamics (e.g. `Low cello drone with rising Vedic chants and subtle string swells`). Build it from the shots' `audio_mus:` stems when present.
 - Use `N/A` if the scene relies purely on diegetic silence/soundscape.

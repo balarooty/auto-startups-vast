@@ -256,6 +256,15 @@ const stageAStep = createStep({
   },
 });
 
+// AQ2 — assemble directorial_breakdown.md deterministically (no model
+// calls); it is the human review document read at GATE 0. Non-fatal: the
+// artifacts it parses already passed validation, so a crash only costs
+// the review doc, not the run.
+async function writeDirectorialBreakdown(run: string): Promise<string> {
+  const res = await runPython("scripts/directorial_breakdown.py", ["--run-dir", run]);
+  return res.code === 0 ? runPath(run, "directorial_breakdown.md") : "";
+}
+
 const critiqueStep = createStep({
   id: "stage-a-critique",
   description: "Agent 6 evaluates all Stage A artifacts against the directing questions; fixer loop until zero FAILs, then a human override if it cannot converge",
@@ -265,6 +274,7 @@ const critiqueStep = createStep({
   suspendSchema: z.object({
     reason: z.string(),
     report: z.string(),
+    breakdown: z.string(),
     errors: z.array(z.string()),
     rounds: z.number(),
   }),
@@ -279,10 +289,13 @@ const critiqueStep = createStep({
         return await suspend({
           reason: "GATE 0 still awaiting director disposition",
           report: reportPath,
+          breakdown: runPath(run, "directorial_breakdown.md"),
           errors: [],
           rounds: env.maxCritiqueRounds,
         });
       }
+      // Re-assemble in case artifacts were hand-edited during the hold.
+      await writeDirectorialBreakdown(run);
       ctx.gates["gate-0"] = true;
       return ctx;
     }
@@ -305,6 +318,7 @@ const critiqueStep = createStep({
         contextFiles: [],
       });
       if (res.ok) {
+        await writeDirectorialBreakdown(run);
         ctx.gates["gate-0"] = true;
         return ctx;
       }
@@ -323,12 +337,14 @@ const critiqueStep = createStep({
       }
     }
 
+    const breakdown = await writeDirectorialBreakdown(run);
     return await suspend({
       reason:
         `GATE 0 unresolved after ${env.maxCritiqueRounds} critique/fix rounds — ` +
-        "review the report and resume with { proceed: true } to override or " +
-        "{ proceed: false } to hold.",
+        "review the report and directorial_breakdown.md, then resume with " +
+        "{ proceed: true } to override or { proceed: false } to hold.",
       report: reportPath,
+      breakdown,
       errors: lastErrors(reportPath),
       rounds: env.maxCritiqueRounds,
     });

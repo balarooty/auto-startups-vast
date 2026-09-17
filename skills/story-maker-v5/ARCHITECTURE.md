@@ -137,6 +137,9 @@ STAGE A: Planning (Claude authors; validate + fix each; no image spend)
 STAGE A-QA: Critique (Claude evaluates; GATE 0; no image spend)
 │
 ├── AQ.   critique_report.md         (Agent 6)  → validate --schema critique
+├── AQ2.  directorial_breakdown.md   (Python, directorial_breakdown.py)
+│         deterministic assembly: intent + arc + color script + manifest
+│         + shot-by-shot table (4-stem audio) — the human review document
 │         ═══ GATE 0 ═══  (zero FAILs required before image generation)
 │
 STAGE B: Image media (Python via Bash; gated)

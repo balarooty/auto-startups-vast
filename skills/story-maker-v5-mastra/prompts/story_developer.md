@@ -132,8 +132,31 @@ board per [`prompts/beat_board.md`](beat_board.md). Agent 2 reads both to group 
 
 ## Output format
 
-1. Animation screenplay in `<run_dir>/developed_story.md` per [`assets/screenplay-format.md`](../assets/screenplay-format.md), inside a `# Screenplay` heading and fenced `text` code block, followed by `## Characters`, `## Locations`, `## Objects`, and `## Constraints` metadata sections.
+1. Animation screenplay in `<run_dir>/developed_story.md` per [`assets/screenplay-format.md`](../assets/screenplay-format.md), inside a `# Screenplay` heading and fenced `text` code block, followed by `## Characters`, `## Locations`, `## Objects`, `## Constraints`, `## Directorial Intent`, and `## Color Script` metadata sections.
 2. Companion canonical JSON in `<run_dir>/story.json` for deterministic machine validation.
+
+## Directorial intent & color script
+
+After the `## Constraints` section, `developed_story.md` must carry two more
+sections — these are the *why* a human reviews before approving the plan:
+
+```markdown
+## Directorial Intent
+3-6 sentences: the narration style (silent visual storytelling vs dialogue),
+the visual language (e.g. tight ground-level macro vs sweeping vistas), the
+tonal strategy, and what the audience should feel at the climax. This is the
+argument for the choices below — not a plot summary.
+
+## Color Script
+Per-scene palette plan keyed to scene ids — color tracks the emotional arc:
+- s1: sun-drenched meadow golds and greens — warmth, safety, play
+- s2: aquamarine + bioluminescent magenta — wonder shifting to awe
+- s3: muted teal and cold navy — the deep, where the fish lurks
+```
+
+`scripts/directorial_breakdown.py` lifts both sections verbatim into the
+review document, and Agent 2 copies each scene's palette into its
+`color_script:` field.
 
 Example `## Constraints` section in `developed_story.md` (canonical
 worked example: [`assets/example-ollie.md`](../assets/example-ollie.md)):
@@ -169,7 +192,12 @@ Example `<run_dir>/story.json`:
   "duration_mode": "preserve_script",
   "target_seconds": 224,
   "characters": [
-    {"id": "char_01", "name": "Young Ollie", "species": "pookoo", "age": 5}
+    {"id": "char_01", "name": "Young Ollie", "species": "pookoo", "age": 5,
+     "state_changes": [
+       {"at": "s1/g1", "becomes": "dry, fluffy fur, russet tuft upright"},
+       {"at": "s1/g3", "becomes": "soaked, fur flat and dripping"},
+       {"at": "s2/g1", "becomes": "soaked + wooden helmet rig + reed snorkel"}
+     ]}
   ],
   "locations": [
     {"id": "loc_01", "name": "Sunlit Pond Edge", "landmarks": ["mossy_boulder", "rock_ledge", "waterline"]}
@@ -188,6 +216,13 @@ Example `<run_dir>/story.json`:
   ]
 }
 ```
+
+`state_changes` (optional, per character) tracks the character's *physical
+condition* evolving through the story — dry→soaked→equipped. Each entry is
+`{at: <scene>/<generation>, becomes: <visible state>}`. Agent 3 echoes the
+active state into each shot's `char_state:` field so the sheet prompter
+renders the right look — a character who got dunked in s1 must not appear
+dry and fluffy in s3.
 
 ## Validate the screenplay
 

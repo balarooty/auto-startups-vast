@@ -178,6 +178,39 @@ def parse_int_list(text: str) -> list[int]:
     return out
 
 
+def parse_char_state(text: str) -> dict[str, str]:
+    """``char_01=soaked, shivering; char_02=dry`` -> {cid: state}.
+
+    Per-shot character-state overrides. ``;`` separates characters; ``=``
+    separates the cid from its state description (commas are allowed inside
+    the state text).
+    """
+    out: dict[str, str] = {}
+    for part in (text or "").split(";"):
+        part = part.strip()
+        if not part or "=" not in part:
+            continue
+        cid, _, state = part.partition("=")
+        cid = cid.strip()
+        if cid:
+            out[cid] = state.strip()
+    return out
+
+
+def shot_audio_text(shot: dict[str, Any]) -> str:
+    """Combined audio plan for a shot: flat ``audio:`` or the 4 stems.
+
+    Stems (``audio_dia``/``audio_fx``/``audio_amb``/``audio_mus``) are
+    authoritative when present; ``audio:`` is the legacy flat form.
+    """
+    stems = [
+        shot.get("audio_dia", ""), shot.get("audio_fx", ""),
+        shot.get("audio_amb", ""), shot.get("audio_mus", ""),
+    ]
+    stem_text = "; ".join(s for s in stems if s)
+    return stem_text or (shot.get("audio", "") or "")
+
+
 def _kv_lines(block: str) -> dict[str, str]:
     """Parse ``key: value`` lines (ignoring tables/headers) into a dict."""
     out: dict[str, str] = {}
@@ -240,6 +273,7 @@ def parse_scenes(md: str) -> dict[str, Any]:
             "layout_strategy": kv.get("layout_strategy", "").strip(),
             "visual_motif": kv.get("visual_motif", "").strip(),
             "sound_world": kv.get("sound_world", "").strip(),
+            "color_script": kv.get("color_script", "").strip(),
         })
     return {"target_seconds": target, "scene_budget": budget, "scenes": scenes}
 
@@ -405,7 +439,12 @@ def parse_storyboard(md: str) -> dict[str, Any]:
             "action": kv.get("action", "").strip(),
             "camera": kv.get("camera", "").strip(),
             "audio": kv.get("audio", "").strip(),
+            "audio_dia": kv.get("audio_dia", "").strip(),
+            "audio_fx": kv.get("audio_fx", "").strip(),
+            "audio_amb": kv.get("audio_amb", "").strip(),
+            "audio_mus": kv.get("audio_mus", "").strip(),
             "dialogue": kv.get("dialogue", "").strip(),
+            "char_state": parse_char_state(kv.get("char_state", "")),
             "shot_size": kv.get("shot_size", "").strip().lower(),
             "composition": [s.strip().lower() for s in kv.get("composition", "").split(",") if s.strip()],
             "acting_beat": kv.get("acting_beat", "").strip(),
@@ -541,6 +580,11 @@ def validate_scenes(
                     f"scene {sid}: {field} is missing — V4 scenes need anime-studio "
                     "style, acting, layout, motif, and sound direction"
                 )
+        if not sc.get("color_script"):
+            res.warn(
+                f"scene {sid}: missing 'color_script:' (encouraged for new runs — "
+                "a per-scene palette plan lifted from the screenplay's Color Script)"
+            )
         known_cids.update(sc["cast"])
     if target_seconds is not None and target_seconds > 0:
         total = sum(sc["target_seconds"] for sc in scenes)
@@ -717,8 +761,28 @@ def validate_storyboard(
                 res.error(f"{slabel}: match_cut requires the matched element named in 'action:'")
 
             # audio_led requires the next shot's audio to be non-empty
-            if trans == "audio_led" and not shot.get("audio"):
-                res.error(f"{slabel}: audio_led transition requires a non-empty 'audio:' (the sound leads the cut)")
+            if trans == "audio_led" and not shot_audio_text(shot):
+                res.error(
+                    f"{slabel}: audio_led transition requires a non-empty audio "
+                    "plan ('audio:' or 'audio_dia/fx/amb/mus:' — the sound leads the cut)"
+                )
+
+            # char_state overrides name the visible state of on-screen
+            # characters — a cid not in characters_present is almost always a typo.
+            for cid in shot.get("char_state", {}):
+                if shot["characters_present"] and cid not in shot["characters_present"]:
+                    res.warn(
+                        f"{slabel}: char_state declares '{cid}' but it is not in "
+                        "characters_present — a typo here silently breaks continuity"
+                    )
+
+            # audio is real — every shot should plan its soundscape, even
+            # when the plan is silence.
+            if not shot_audio_text(shot) and not shot.get("dialogue"):
+                res.warn(
+                    f"{slabel}: no audio planning (audio: or audio_dia/fx/amb/mus) — "
+                    "write 'audio: Silence.' if the shot is intentionally silent"
+                )
 
             # shot_size validation (optional but encouraged)
             ss = shot.get("shot_size", "")

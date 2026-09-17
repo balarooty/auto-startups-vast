@@ -103,7 +103,7 @@ same-character `hard_cut` and on 3+ consecutive identical transitions.
 | `reaction_cut` | action → face/reaction beat | `Cut to the reaction.` |
 | `match_cut` | graphic or positional match on a named element | `Match cut on <element>.` (name the element in `action:`) |
 | `whip_pan` | camera-motivated transition; fast pan | `Whip pan transition.` |
-| `audio_led` | next shot's sound starts before the visual (L/J cut) | `Audio leads the cut.` (requires non-empty `audio:` on this shot) |
+| `audio_led` | next shot's sound starts before the visual (L/J cut) | `Audio leads the cut.` (requires a non-empty audio plan on this shot) |
 | `camera_move` | only framing/angle changes — **not a cut** | *(renders as a camera line, no cut phrase)* |
 
 **Anti-monotony**: vary transitions within a generation. The validator warns
@@ -254,8 +254,23 @@ Animation principles to apply:
 - **`characters_present` ⊆ scene `cast`.** Never invent a `char_NN` not in the
   scene's cast.
 - **`audio` is real.** Minimax generates native stereo audio — plan the
-  soundscape (footsteps, ambience, music cue) per shot, and put spoken lines
-  in `dialogue`.
+  soundscape per shot, and put spoken lines in `dialogue`. Prefer the
+  **4-stem layout** so each layer is explicit (and the video prompter can
+  route them correctly):
+  - `audio_dia:` — dialogue-adjacent vocal sound (grunts, cries, breaths;
+    spoken lines still go in `dialogue:`)
+  - `audio_fx:` — physical foley (footsteps, splashes, impacts)
+  - `audio_amb:` — diegetic ambience / room tone
+  - `audio_mus:` — non-diegetic score cue (instrumentation + tempo, not mood)
+  A flat `audio:` line covering all layers is still legal (legacy form);
+  when any stem is present, the stems are authoritative. Silence is a valid
+  plan — write `audio: Silence.` rather than leaving it empty.
+- **`char_state` tracks physical condition.** When a character's visible
+  state in this shot differs from their baseline sheet (soaked, helmet on,
+  muddy), declare it: `char_state: char_01=soaked, fur flat and dripping`.
+  Keys must appear in `characters_present` — the validator warns otherwise.
+  Derive states from `story.json`'s per-character `state_changes` so the
+  condition is consistent shot to shot (dunked in s1 → still wet in s3).
 - **Screenplay Extraction Authority (MANDATORY).** `developed_story.md` is a
   full animation screenplay. Extract `dialogue:`, `acting_beat:`, and sound
   events directly from it:
@@ -265,8 +280,9 @@ Animation principles to apply:
   - **`acting_beat:`** should mirror the screenplay's action line micro-beats
     (e.g. screenplay says *"His hind foot SLIPS. The basket tips."* →
     `acting_beat: foot slips → lurch forward → basket tips`).
-  - **`audio:`** should harvest ALL-CAPS sound cues from the screenplay's
-    action lines into the soundscape (e.g. `SPLASH`, `CREAK`, `SNAP`).
+  - **`audio:` / audio stems** should harvest ALL-CAPS sound cues from the
+    screenplay's action lines into the soundscape (e.g. `SPLASH`, `CREAK`,
+    `SNAP`) — foley cues go to `audio_fx:`, environment to `audio_amb:`.
 - **The handoff block is mandatory** (it seeds the next scene's opening).
 
 ## Output format (load-bearing — verbatim)
@@ -300,7 +316,11 @@ screen_direction: held
 camera_angle: low_angle
 action: Ollie sits on the mossy boulder cradling his bark basket adorned with a spiral seashell and pink blossoms, beaming proudly.
 camera: Slow Push In.
-audio: soft contented sniff, shell clinking in basket, meadow birds, gentle breeze.
+audio_dia: soft contented sniff
+audio_fx: shell clinking in basket
+audio_amb: meadow birds, gentle breeze
+audio_mus: whimsical acoustic strings, medium tempo
+char_state: char_01=dry, fluffy fur, russet tuft upright
 dialogue:
 
 ### Shot 2 — 2.5-5.0s (hard_cut)

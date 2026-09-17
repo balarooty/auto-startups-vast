@@ -123,6 +123,22 @@ Ollie's eyes widen. A lightbulb goes off.
   rule: End title card is an editorial graphic, excluded from sheets.
 ```
 
+`## Directorial Intent` + `## Color Script` sections (canonical shapes):
+
+```markdown
+## Directorial Intent
+A nearly dialogue-free silent narrative: Ollie's wonder must read entirely
+through pantomime and framing. Tight ground-level shots place the viewer at
+Pookoo height — the pond is an alien world glimpsed through a wooden tube.
+Warm, playful tone pivots to awe at the reveal; the fish must feel vast and
+benign-turned-menacing in a single shot.
+
+## Color Script
+- s1: sun-drenched meadow golds and greens — warmth, safety, play
+- s2: aquamarine + bioluminescent magenta — wonder shifting to awe
+- s3: muted teal and cold navy — the deep, where the fish lurks
+```
+
 ```json
 {
   "title": "Ollie's Dive",
@@ -130,7 +146,12 @@ Ollie's eyes widen. A lightbulb goes off.
   "duration_mode": "preserve_script",
   "target_seconds": 224,
   "characters": [
-    {"id": "char_01", "name": "Young Ollie", "species": "pookoo", "age": 5},
+    {"id": "char_01", "name": "Young Ollie", "species": "pookoo", "age": 5,
+     "state_changes": [
+       {"at": "s1/g1", "becomes": "dry, fluffy fur, russet tuft upright"},
+       {"at": "s1/g3", "becomes": "soaked, fur flat and dripping"},
+       {"at": "s2/g1", "becomes": "soaked + wooden helmet rig + reed snorkel"}
+     ]},
     {"id": "char_02", "name": "Caloo", "species": "pookoo"},
     {"id": "char_03", "name": "Giant Valley Fish", "species": "fish"}
   ],
@@ -230,6 +251,7 @@ layout_strategy: boulder and basket foreground-right, pond opening
 visual_motif: round openings — basket mouth, cylinder rim, pond surface —
   each a portal that grows in meaning
 sound_world: meadow birds, gentle water lap, whimsical acoustic strings
+color_script: sun-drenched meadow golds and greens — warmth, safety, play
 beat: A spilled basket reveals an underwater world to a young inventor.
 
 ## Scene s2 — The Underwater World
@@ -309,8 +331,11 @@ action: Unbroken continuous master take: Ollie lies prone at the pond
   eyes widen into a grinning lightbulb moment.
 camera: Slow Push In with small amplitude at slow speed, drifting toward
   the cylinder opening.
-audio: muffled underwater hum through the tube, water lap, a single
-  inquisitive celesta note.
+audio_dia: soft sniff inside the tube, a tiny gasp
+audio_fx: water lapping the ledge, cylinder scraping stone
+audio_amb: muffled underwater hum through the tube, distant meadow birds
+audio_mus: a single inquisitive celesta phrase over sustained strings
+char_state: char_01=dry, fluffy fur, russet tuft upright
 dialogue:
 ```
 

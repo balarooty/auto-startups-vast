@@ -118,6 +118,15 @@ The validator checks that key action words from each shot's `action:` field
 appear in the corresponding panel descriptions. Drift will be flagged as a
 validation error.
 
+### Character state & color script
+
+- When a shot declares `char_state:` (e.g. `char_01=soaked, fur flat and
+  dripping`), every panel that shot claims must render that state — a
+  character dunked in shot 5 cannot appear dry and fluffy in its panels.
+- The scene's `color_script:` (from `scenes.md`) pins the palette: echo it
+  into RENDERING STYLE and panel lighting so the emotional color arc
+  survives onto the sheet.
+
 ### Continuity rules
 
 In CONTINUITY RULES, state what must remain identical across every panel:

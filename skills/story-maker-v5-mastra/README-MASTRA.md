@@ -69,7 +69,11 @@ curl -X POST http://localhost:4111/api/workflows/episode/resume \
 `approved: false` + `notes` re-suspends with your feedback attached — the gate
 holds until explicitly approved. GATE 0 (`stage-a-critique`) resumes with
 `{"proceed": true|false}` — it only suspends if the critique/fix loop cannot
-converge on its own.
+converge on its own. Either way the step assembles
+`<run>/directorial_breakdown.md` (via `scripts/directorial_breakdown.py`) —
+the human-readable review document (intent, arc, color script, asset
+manifest, shot-by-shot table) — and a suspend payload carries its path in
+`breakdown`.
 
 ## Model config
 
