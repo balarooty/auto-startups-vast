@@ -204,8 +204,22 @@ hf_download "fal/MiniMax-H3-Realism-People-LoRA" "h3-realism-people-t2v-i2v-r2v.
 
 
 # ── Latent Upscale Model ──
-echo "[10/13] minimax_h3_latent_upscaler_3d_fp16.safetensors (Latent Upscaler 3D)..."
-hf_download "LBH-123-AI/Minimax_h3_latent_Upscaler" "minimax_h3_latent_upscaler_3d_fp16.safetensors" "$BASE_DIR/latent_upscale_models"
+# NOTE: HF repo LBH-123-AI/Minimax_h3_latent_Upscaler reshuffled the weights into a
+# `minimax_h3_latent_upscaler_3d_conv_v1/` subdir (2026-09). The bare filename 404s.
+# Download the nested file then flatten it to the exact name the workflow references
+# (minimax_h3_latent_upscaler_3d_fp16.safetensors) so the node's dropdown picks it up.
+echo "[10/13] minimax_h3_latent_upscaler_3d_fp16.safetensors (Latent Upscaler 3D, nested repo)..."
+SRC="minimax_h3_latent_upscaler_3d_conv_v1/minimax_h3_latent_upscaler_3d_conv_v1_fp16.safetensors"
+TGT="$BASE_DIR/latent_upscale_models/minimax_h3_latent_upscaler_3d_fp16.safetensors"
+if [ ! -s "$TGT" ]; then
+    hf_download "LBH-123-AI/Minimax_h3_latent_Upscaler" "$SRC" "$BASE_DIR/latent_upscale_models"
+    if [ -s "$BASE_DIR/latent_upscale_models/$SRC" ]; then
+        mv "$BASE_DIR/latent_upscale_models/$SRC" "$TGT"
+        echo "  ✅ flattened to $TGT"
+    fi
+else
+    echo "  ✅ already present: $TGT"
+fi
 
 # ── Tiny VAE for live preview ──
 echo "[11/13] taeh3.safetensors (Tiny VAE - live preview)..."
