@@ -131,7 +131,7 @@ fi
 if [ -f /opt/supervisor-scripts/comfyui.sh ] && \
    ! grep -q -- '--disable-comfy-compiler' /opt/supervisor-scripts/comfyui.sh; then
     echo "  📥 Adding --disable-comfy-compiler --lowvram to the supervisor launch line..."
-    sed -i 's#${COMFYUI_ARGS} 2>&1#${COMFYUI_ARGS} --disable-comfy-compiler --lowvram 2\&1#' \
+    sed -i 's#${COMFYUI_ARGS} 2>&1#${COMFYUI_ARGS} --disable-comfy-compiler --lowvram 2>\&1#' \
         /opt/supervisor-scripts/comfyui.sh || true
 fi
 
