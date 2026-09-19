@@ -243,3 +243,64 @@ def load_character_prompt(prompt_path: str) -> tuple[str, dict[str, Any] | None]
         except json.JSONDecodeError:
             return raw, None
     return raw, None
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 — expression & pose performance sheets
+# ---------------------------------------------------------------------------
+
+# Viseme / mouth-chart row appended to the expression sheet (lip-sync anchors).
+VISEME_ROW = ["AI (open)", "E (wide)", "O (round)", "U (pursed)",
+              "MBP (closed)", "FV (teeth-lip)", "L (tongue)", "Rest (neutral)"]
+
+POSE_LIST = ["Idle / neutral standing", "Walk cycle mid-stride", "Run cycle mid-stride",
+             "Jump at apex", "Sit relaxed", "Reach / grab outward"]
+
+
+def build_expression_sheet_prompt(
+    character: dict[str, Any], *, render_style: str,
+) -> str:
+    """Build a prompt for a 12-expression grid + viseme mouth chart.
+
+    The character's identity sheet is passed separately as a reference image;
+    this prompt describes only the grid content. Signature expressions (from
+    the character's ``expressions`` field, authored in developed_story.md) lead
+    the grid so the model emphasises the character's defining looks.
+    """
+    f = resolve_character_sheet_fields(character)
+    name = f["character_name"]
+    signature = character.get("expressions") or []
+    expressions = list(signature) + [e for e in EXPRESSION_LIST if e not in signature]
+    expressions = expressions[:12]
+    expr_lines = "\n".join(f"  {i+1}. {e}" for i, e in enumerate(expressions))
+    viseme_lines = ", ".join(VISEME_ROW)
+    return (
+        f"A character EXPRESSION SHEET for {name}, in {render_style}.\n\n"
+        f"Match the character's exact design, proportions, costume, and palette from the "
+        f"reference image — this is the SAME character, only the facial expression changes.\n\n"
+        f"Top grid — {len(expressions)} head-and-shoulders expression studies in a clean "
+        f"4x3 grid on a plain light background, consistent lighting:\n{expr_lines}\n\n"
+        f"Bottom row — a mouth/viseme chart showing the mouth shapes: {viseme_lines}.\n\n"
+        f"Clean, readable, animation-production model sheet. No text labels burned into "
+        f"expressions themselves; consistent head size across all cells."
+    )
+
+
+def build_pose_sheet_prompt(
+    character: dict[str, Any], *, render_style: str,
+) -> str:
+    """Build a prompt for a key-action pose sheet (full body)."""
+    f = resolve_character_sheet_fields(character)
+    name = f["character_name"]
+    poses = character.get("action_poses") or POSE_LIST
+    poses = poses[:6]
+    pose_lines = "\n".join(f"  {i+1}. {p}" for i, p in enumerate(poses))
+    return (
+        f"A character POSE SHEET for {name}, in {render_style}.\n\n"
+        f"Match the character's exact design, proportions, costume, and palette from the "
+        f"reference image — this is the SAME character in different full-body poses.\n\n"
+        f"Show {len(poses)} full-body key poses in a clean row/grid on a plain light "
+        f"background, consistent scale and lighting:\n{pose_lines}\n\n"
+        f"Clear silhouettes, weight and balance readable in each pose. "
+        f"Animation-production model sheet."
+    )

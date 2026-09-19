@@ -6,6 +6,58 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [4.3.0] - 2026-09-19
+
+Full animation/cartoon direction upgrade — Phases 1–3 of
+[`plans/story-maker-v4-animation-direction.md`](../../plans/story-maker-v4-animation-direction.md).
+
+### Highlights
+- **12 Principles formalized** (Phase 1): cinematography bible Section G-bis maps every
+  principle to "how AI fails it" + exact prompt phrasing; new per-shot `motion_profile:`
+  field (easing / cadence / principle flags) enforced by the storyboard validator.
+- **Animatic stage + GATE 1.5** (Phase 3): `scripts/build_animatic.py` builds a
+  duration-timed panel slideshow with scratch audio from rendered sheets — pacing is
+  confirmed on video **before any paid render**. Four gates now (0, 1, 1.5, 2).
+- **Performance assets** (Phase 2): per-character expression sheets (12-expression grid +
+  viseme mouth chart) and pose sheets generated from the identity sheet, registered for
+  cross-episode reuse.
+- **Art-direction lock** (Phase 2): `style_bible.md` with palette script + Do/Don't list;
+  scenes validator cross-checks `style_target`/`visual_motif` against it.
+- **Score continuity** (Phase 2): `sound_map.md` defines the music arc + character
+  leitmotifs; Agent 5 references motifs instead of inventing per-shot music.
+- **Exposure-sheet lite** (Phase 2): per-generation `timing_sheet_<scene>_g<gen>.md`
+  (0.5s rows of dialogue/action/camera/sound keys); validator errors when a dialogue
+  line exceeds ~2.5 words/sec (lip-sync feasibility).
+
+### Added
+- `assets/cinematography-bible.md` Section G-bis — 12 principles for AI video.
+- `MOTION_PROFILE_TERMS` + follow-through heuristic in `tools/validators.py`.
+- `validate_style_bible()` / `validate_sound_map()` / `validate_timing_sheet()` +
+  `--schema style_bible|sound_map|timing_sheet` in `scripts/validate.py`.
+- `prompts/style_bible.md`, `prompts/sound_map.md`, `prompts/timing_sheet.md`.
+- `build_expression_sheet_prompt()` / `build_pose_sheet_prompt()` in
+  `tools/char_sheet_builder.py`; `generate_character_variant_sheet()` +
+  `AssetRegistry.character_variant_path()` in `tools/image_pipeline.py`;
+  `BUILD_CHARACTER_VARIANT_SHEETS` in `config.py`.
+- `scripts/build_animatic.py` — deterministic animatic builder (PIL slicing, ffmpeg,
+  macOS `say`/`espeak` scratch TTS; no LLM calls, no paid calls).
+- 40 new animation-craft questions (Q6.26–Q6.45; Section 6 now 45 questions).
+- Tests: `tests/test_motion_profile.py` (9), `tests/test_phase2_schemas.py` (10),
+  `tests/test_char_variant_sheets.py` (5), `tests/test_animatic.py` (6).
+
+### Changed
+- `prompts/storyboard_planner.md` — `motion_profile:` field docs + timing-sheet output.
+- `prompts/story_developer.md` — style_bible + character signature expressions.
+- `prompts/scene_writer.md` — sound_map output.
+- `prompts/video_prompter.md` — motif continuity, lip-sync/VO rule, timing-sheet compile,
+  motion_profile translation.
+- `prompts/image_prompter.md` — expression/pose sheet references for acting shots.
+- `prompts/critique_agent.md` — question-bank count updated (260+).
+- `SKILL.md` — GATE 1.5 + Stage B.5 + pitfalls #9/#14 updated; version 4.3.0.
+- `ARCHITECTURE.md` — pipeline diagrams, gate summary, and file map updated.
+
+---
+
 ## [4.2.0] - 2026-09-10
 
 ### Highlights

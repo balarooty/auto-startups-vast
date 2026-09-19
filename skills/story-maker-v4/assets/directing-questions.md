@@ -196,12 +196,12 @@ artifacts, producing `critique_report.md` with PASS/FAIL per question.
 - **Pass:** progression from wide → medium → closeup as tension builds.
 - **Fail:** no progression (random sizes) or reverse progression (closeup → wide during tension).
 
-### Q2.6 — Are there 5-8 micro-shots per 15s generation for fast-paced content?
+### Q2.6 — Are there 5-8 micro-shots per generation for fast-paced content?
 - **Check:** storyboard_sN.md — generation shot count matches pacing intent.
 - **Pass:** 5-8 shots for action/fast-paced generations; fewer for tender beats.
 - **Fail:** too few shots (slow) or too many (chaotic) for the intended pacing.
 
-### Q2.7 — Are tender/dialogue beats allowed longer shots (6-15s)?
+### Q2.7 — Are tender/dialogue beats allowed longer shots (6-20s)?
 - **Check:** storyboard_sN.md — emotional/dialogue shots aren't cut too fast.
 - **Pass:** tender beats have shots longer than 4s with camera breathing.
 - **Fail:** tender beats cut every 1.5s (undermines the emotion).
@@ -724,7 +724,7 @@ artifacts, producing `critique_report.md` with PASS/FAIL per question.
 - **Pass:** removing any cut would lose information.
 - **Fail:** cuts that don't add information (should be camera_move).
 
-### Q5.19 — Does the editing respect the 15s generation limit?
+### Q5.19 — Does the editing respect the 20s generation limit?
 - **Check:** storyboard_sN.md — no shot straddles a generation boundary.
 - **Pass:** shots that don't fit move to the next generation (structurally validated).
 - **Fail:** shots straddling boundaries (structurally errored).
@@ -756,7 +756,7 @@ artifacts, producing `critique_report.md` with PASS/FAIL per question.
 
 ---
 
-## Section 6: Animation Direction (25 questions)
+## Section 6: Animation Direction (45 questions)
 
 ### Q6.1 — Is action: written as micro-beats, not single verbs?
 - **Check:** storyboard_sN.md — each shot's action: is a sequence of micro-beats.
@@ -882,6 +882,106 @@ artifacts, producing `critique_report.md` with PASS/FAIL per question.
 - **Check:** storyboard_sN.md — the last shot's action is iconic.
 - **Pass:** "Kemi slides to a hero stop, tin raised high, dust settling."
 - **Fail:** the last shot's action is forgettable.
+
+### Q6.26 — Does every moving shot declare an easing in `motion_profile:`?
+- **Check:** storyboard_sN.md — shots with a camera move or character locomotion have one easing term (`ease_in`/`ease_out`/`ease_in_out`/`linear`/`snap`).
+- **Pass:** `motion_profile: ease_in_out, on_twos` on a tracking shot.
+- **Fail:** camera/character moves with no easing (linear, robotic motion).
+
+### Q6.27 — Is the frame cadence declared for the production's style target?
+- **Check:** storyboard_sN.md — 2D anime/cartoon scenes use `on_twos` for held/acting shots and `on_ones` for action peaks.
+- **Pass:** dialogue/acting shots `on_twos`, the climax action shot `on_ones`.
+- **Fail:** no cadence anywhere (every shot full-motion → no cartoon feel).
+
+### Q6.28 — Does every impact/leap action carry `follow_through`?
+- **Check:** storyboard_sN.md — any shot whose `action:` has jump/slam/land/throw/kick/crash/fall/burst has `follow_through` in `motion_profile:`.
+- **Pass:** leap shot → `motion_profile: ease_in, on_ones, follow_through`.
+- **Fail:** impact action with no follow-through flag (the validator also warns).
+
+### Q6.29 — Is overlapping action used on multi-part body moves?
+- **Check:** storyboard_sN.md — turns, lunges, and get-ups use `overlapping` or describe staged body-part order.
+- **Pass:** "hip rotates, chest follows, then shoulders" / `motion_profile: …, overlapping`.
+- **Fail:** whole body moves as one rigid block.
+
+### Q6.30 — Is secondary motion flagged on shots with cloth/hair/props?
+- **Check:** storyboard_sN.md — shots featuring capes, long hair, ears, or loose props use `secondary_motion`.
+- **Pass:** the running hero's coat → `motion_profile: …, follow_through, secondary_motion`.
+- **Fail:** flowing elements present but never given secondary motion.
+
+### Q6.31 — Are key poses named for pose-to-pose action shots?
+- **Check:** storyboard_sN.md — action shots name the key poses in order, not just the move.
+- **Pass:** "start crouched → mid-air stretch → landed crouch, arms out."
+- **Fail:** "he jumps over the gap" (no key poses → mushy motion).
+
+### Q6.32 — Does the camera ease rather than start/stop instantly?
+- **Check:** storyboard_sN.md — `camera:` push/tracking/crane moves pair with an easing term in `motion_profile:`.
+- **Pass:** "Push In" + `motion_profile: ease_in_out`.
+- **Fail:** hard start/stop camera with `linear` or no easing on a slow dramatic move.
+
+### Q6.33 — Are `hold` poses used at shot ends that hand off to the next generation?
+- **Check:** storyboard_sN.md — the final shot of a generation ends on a held/settle pose (`hold` cadence or a settle beat).
+- **Pass:** generation ends on "settles into a held two-shot" for clean tail-ref handoff.
+- **Fail:** generation cuts mid-action with no held frame to continue from.
+
+### Q6.34 — Does dialogue fit its shot duration?
+- **Check:** storyboard_sN.md — spoken lines are short enough to be said within the shot (≈2.5 words/sec ceiling).
+- **Pass:** a 4s shot carries a line of ≤10 words.
+- **Fail:** a 2s shot carries a 15-word line (lip-sync will rush or truncate).
+
+### Q6.35 — Is the speaker's mouth on-camera during their line?
+- **Check:** storyboard_sN.md — when a shot has `dialogue:`, the speaking character is framed so the mouth is visible; off-screen lines are marked VO.
+- **Pass:** MCU on the speaker during their `<d>` line.
+- **Fail:** dialogue delivered while the speaker's face is turned away/off-frame with no VO note.
+
+### Q6.36 — Are consecutive action shots varied in cadence?
+- **Check:** storyboard_sN.md — an action sequence alternates `on_ones` peaks with held reaction frames rather than uniform full-motion.
+- **Pass:** punch (`on_ones`) → reaction hold (`on_twos`) → counter (`on_ones`).
+- **Fail:** five consecutive identical-cadence action shots (rhythm flattens).
+
+### Q6.37 — Is exaggeration pushed hardest at the climax?
+- **Check:** storyboard_sN.md — cross-reference Q6.21: the climax shot has the most exaggerated poses/expressions and `snap`/`on_ones` energy.
+- **Pass:** climax uses `motion_profile: snap, on_ones, follow_through` + "jaw drops impossibly wide."
+- **Fail:** climax motion profile identical to quiet beats.
+
+### Q6.38 — Are quiet/tender beats given `hold` + secondary motion, not frozen frames?
+- **Check:** storyboard_sN.md — cross-reference Q6.22: tender shots use `hold` cadence plus `secondary_motion` (breathing, blink, hair drift).
+- **Pass:** "settles into a held close-up, chest rising, hair drifting" + `motion_profile: hold, secondary_motion`.
+- **Fail:** tender shot is a dead freeze with zero motion cues.
+
+### Q6.39 — Is `snap` reserved for genuine shocks/whips, not overused?
+- **Check:** storyboard_sN.md — `snap` easing appears only on jump-scares, whip actions, or impact frames, not on gentle moves.
+- **Pass:** one `snap` on the reveal; everything else `ease_in_out`.
+- **Fail:** every shot `snap` (motion feels jittery and cheap).
+
+### Q6.40 — Do reaction shots use a micro-beat then a settle hold?
+- **Check:** storyboard_sN.md — reaction shots sequence stimulus → freeze → micro-expression → settle, ending on a hold.
+- **Pass:** "freezes, eyes widen, breath catches, settles" + `motion_profile: on_twos, hold`.
+- **Fail:** reaction is a single instant expression change with no settle.
+
+### Q6.41 — Are arcs described for swinging/reaching/turning motions?
+- **Check:** storyboard_sN.md — limb and camera moves describe curved paths.
+- **Pass:** "arm swings in a wide arc"; "camera arcs around the pair."
+- **Fail:** all movement described as straight A-to-B lines.
+
+### Q6.42 — Does each character keep a distinct movement signature via `motion_profile:`?
+- **Check:** storyboard_sN.md — a heavy character's shots lean `ease_in, on_twos`; a sprightly character's lean `snap, on_ones`.
+- **Pass:** the big brute `ease_in`+`follow_through`; the kid `snap`+`on_ones`.
+- **Fail:** all characters share one identical motion profile.
+
+### Q6.43 — Are held poses given enough frames to read (not sub-second)?
+- **Check:** storyboard_sN.md — `hold` cadence shots are ≥1.5s so the held pose registers.
+- **Pass:** a 2s `hold` reaction shot.
+- **Fail:** a 0.5s `hold` (too short to read as a deliberate hold).
+
+### Q6.44 — Is every `motion_profile:` term valid and non-contradictory?
+- **Check:** storyboard_sN.md — terms are from the whitelist and a shot never carries two easings or two cadences (the validator errors on both).
+- **Pass:** `motion_profile: ease_in_out, on_twos, follow_through`.
+- **Fail:** `motion_profile: ease_in, ease_out` (contradiction) or an unknown term.
+
+### Q6.45 — Does the overall episode cadence serve the style target?
+- **Check:** storyboard_sN.md across scenes — a 2D anime episode is predominantly `on_twos` with `on_ones` reserved for action; a 3D cartoon episode is predominantly `on_ones`/`ease_in_out`.
+- **Pass:** cadence distribution matches the declared `style_target`.
+- **Fail:** a "limited-animation 2D anime" episode that is 100% `on_ones`.
 
 ---
 

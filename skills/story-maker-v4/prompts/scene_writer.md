@@ -2,7 +2,8 @@
 
 **Input:** `<run_dir>/developed_story.md` (Agent 1) + `<run_dir>/beat_board.md`
 (Agent 1b) + the run target duration (seconds).
-**Output:** `<run_dir>/scenes.md` — the scene breakdown. Then run
+**Output:** `<run_dir>/scenes.md` — the scene breakdown, plus
+`<run_dir>/sound_map.md` — the score/leitmotif plan (see below). Then run
 `python3 scripts/validate.py scenes.md --schema scenes --target-seconds <N> --run-dir <run_dir>`
 and fix until it passes.
 
@@ -14,7 +15,7 @@ register and rough timing. Group these beats into **N scenes**, where
 140s → 2 scenes, 70s → 1 scene.) Each scene is later split by Agent 3 into Minimax
 H3 generations of at most 15 seconds each (a ~70s scene ≈ 5 generations, each with
 its own storyboard sheet). Group beats so each scene is a self-contained unit of
-action in ONE location, and prefer beats that break naturally into <=15s stretches
+action in ONE location, and prefer beats that break naturally into <=20s stretches
 of continuous action.
 
 **Screenplay Authority:** `developed_story.md` is now a full animation screenplay
@@ -98,4 +99,15 @@ python3 scripts/validate.py <run_dir>/scenes.md --schema scenes --target-seconds
 ```
 Read `<run_dir>/scenes.md.validation.json`; on `ok:false`, fix the listed errors and
 re-run. The validator cross-checks `beats:` against `beat_board.md` when it exists
-in the run dir. Do not proceed to Agent 3 until scenes pass.
+in the run dir, and cross-checks `style_target`/`visual_motif` against
+`style_bible.md` when that exists. Do not proceed to Agent 3 until scenes pass.
+
+## Sound Map (score & sound continuity)
+
+Author `<run_dir>/sound_map.md` per [`prompts/sound_map.md`](sound_map.md)
+alongside `scenes.md`. It defines the episode **music arc**, a **leitmotif per
+named character**, and per-scene ambience/motif/music/sting entries. Agent 5's
+`non_diegetic_music` and ambience layers reference these motif names so the
+score stays continuous across 20s generations instead of being reinvented per
+render. Validate with
+`python3 scripts/validate.py sound_map.md --schema sound_map --run-dir <run_dir>`.

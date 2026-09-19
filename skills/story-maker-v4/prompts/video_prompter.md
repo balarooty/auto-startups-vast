@@ -48,6 +48,28 @@ foley anchors (e.g. `heavy SPLASH as basket hits water, wet GLUG-GLUG-GLUG`).
 **Transition Semantics:**
 - When using `audio_led` cut transitions, explicitly indicate that the incoming shot's `foley_and_sfx` or `environmental_ambience` begins 0.5–1.0s before the visual cut (pre-lap / J-cut).
 
+**Score continuity (sound_map):** When `<run_dir>/sound_map.md` exists, build
+`non_diegetic_music` from its **leitmotif names and music arc** rather than
+inventing per-shot music. Reference the motif (e.g. "Kemi's plucky pizzicato
+leitmotif swells") and the scene's score function from the sound map so the
+score stays continuous across the 20s generations.
+
+**Lip-sync & dialogue timing:** H3 lip-syncs only visible faces. A `<d>` line
+must sit in a shot where the speaker's mouth is on-camera; if the speaker is
+off-frame, mark it as voice-over (VO). Keep spoken lines within ~2.5 words/sec
+of the shot's duration. When a `timing_sheet_<scene>_g<gen>.md` exists for this
+generation, compile its 0.5s dialogue-phoneme / action / camera / sound rows
+into the `detailed_description` timeline so delivery, motion, and cuts land on
+the planned frames.
+
+**Motion craft (motion_profile):** When the storyboard declares a shot's
+`motion_profile:`, translate it into the shot description — easing (slow in /
+slow out), cadence (`on_twos` held-pose cartoon feel vs `on_ones` fluid
+action), and principle flags (`follow_through`, `overlapping`,
+`secondary_motion`). See
+[`assets/cinematography-bible.md`](../assets/cinematography-bible.md) Section
+G-bis for the exact phrasing per term.
+
 ---
 
 ### Director's Brief Format Structure
@@ -121,8 +143,9 @@ Consult [`assets/cinematography-bible.md`](../assets/cinematography-bible.md) fo
 
 4. **Dynamic Shot Depth & Duration (1-Shot Master Oners & Asymmetric Cuts)**:
    - Timeline shot counts and durations must match the dynamic storyboard exactly.
-   - Support the full dynamic range: from an unbroken 15.0s master take (oner), to an asymmetric 2-shot dynamic (e.g. 11.5s master + 3.5s reaction; 9.0s dialogue + 6.0s response), to a 3-shot action arc (e.g. 6.0s + 2.5s + 6.5s).
-   - **For a 1-Shot Master Take (10.0s–15.0s)**: Write the entire timeline under `[Shot 1]` with NO cut timestamps. Describe continuous, motivated camera movement that tracks the action throughout the full 15s duration (e.g. tracking alongside characters, curving down a chute, dynamic crane/tilt) with seamless unbroken Foley, soundscape, and dialogue.
+   - Shot count per generation is dictated by narrative necessity — never default to a fixed count (e.g. always 3 shots). Adjacent generations must not repeat the same shot count unless dramatically justified; a uniform count pattern across generations (e.g. 3-3-3) is mechanical pacing and the storyboard validator flags it.
+   - Support the full dynamic range: from an unbroken 20.0s master take (oner), to an asymmetric 2-shot dynamic (e.g. 11.5s master + 3.5s reaction; 9.0s dialogue + 6.0s response), to a 3-shot action arc (e.g. 6.0s + 2.5s + 6.5s), to a rapid 4+ shot montage for high-tempo sequences.
+   - **For a 1-Shot Master Take (10.0s–20.0s)**: Write the entire timeline under `[Shot 1]` with NO cut timestamps. Describe continuous, motivated camera movement that tracks the action throughout the full generation duration (e.g. tracking alongside characters, curving down a chute, dynamic crane/tilt) with seamless unbroken Foley, soundscape, and dialogue.
    - Never mechanically chop generations into uniform slices. The duration must fit the physical action and emotional beats.
 
 5. **Target Depth & Word Count**:

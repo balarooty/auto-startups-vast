@@ -30,7 +30,11 @@ sys.path.insert(0, str(SKILL_ROOT))
 import config  # noqa: E402
 from tools import image_pipeline as ip  # noqa: E402
 from tools import validators  # noqa: E402
-from tools.char_sheet_builder import load_character_prompt  # noqa: E402
+from tools.char_sheet_builder import (
+    load_character_prompt,
+    build_expression_sheet_prompt,
+    build_pose_sheet_prompt,
+)  # noqa: E402
 from tools.location_sheet_builder import load_location_prompt  # noqa: E402
 from tools.object_sheet_builder import load_object_prompt  # noqa: E402
 
@@ -83,18 +87,59 @@ def build_assets(reg: ip.AssetRegistry, scenes: dict) -> None:
             entry = reg.character(cid)
             entry["output_path"] = c_path
             print(f"  char sheet {cid}: exists, skip")
+        else:
+            txt_path = ip.character_prompt_path(reg.run_dir, cid)
+            json_path = txt_path[:-4] + ".json"
+            prompt_text, fields = load_character_prompt(txt_path)
+            if not prompt_text and not fields and os.path.isfile(json_path):
+                _, fields = load_character_prompt(json_path)
+            if not prompt_text and not fields:
+                raise SystemExit(f"missing char prompt for {cid}: {txt_path} (or .json)")
+            ref_names, prompt_text = ip.parse_ref_images(prompt_text)
+            ref_urls = ip.resolve_ref_names(reg, ref_names) if ref_names else None
+            print(f"  char sheet {cid}: generating (refs: {ref_names}) ...")
+            ip.generate_character_sheet(reg, cid, prompt_text=prompt_text, character_fields=fields, ref_urls=ref_urls)
+        _build_character_variants(reg, cid)
+
+
+def _build_character_variants(reg: ip.AssetRegistry, cid: str) -> None:
+    """Generate the expression + pose performance sheets for one character.
+
+    These are derived from the identity sheet (passed as a reference image) so
+    the performance sheets stay on-model. Resume-safe and reused across
+    episodes via the ``characters`` registry table under ``<cid>_<variant>``.
+    Controlled by ``config.BUILD_CHARACTER_VARIANT_SHEETS``.
+    """
+    if not getattr(config, "BUILD_CHARACTER_VARIANT_SHEETS", True):
+        return
+    identity_path = reg.character_path(cid)
+    if not _exists(identity_path):
+        return
+    identity_url = ip.ensure_asset_url(reg.character(cid))
+    if not identity_url:
+        return
+    char_fields = reg.character(cid)
+    character = {
+        "id": cid,
+        "name": char_fields.get("name", cid),
+        "appearance": char_fields.get("appearance", ""),
+        "species": char_fields.get("species", ""),
+        "expressions": char_fields.get("expressions"),
+        "action_poses": char_fields.get("action_poses"),
+    }
+    render_style = getattr(ip, "RENDER_STYLE", "stylized animation")
+    for variant, builder in (
+        ("expressions", build_expression_sheet_prompt),
+        ("poses", build_pose_sheet_prompt),
+    ):
+        v_path = reg.character_variant_path(cid, variant)
+        if _exists(v_path):
+            reg.character(f"{cid}_{variant}")["output_path"] = v_path
+            print(f"  char {variant} sheet {cid}: exists, skip")
             continue
-        txt_path = ip.character_prompt_path(reg.run_dir, cid)
-        json_path = txt_path[:-4] + ".json"
-        prompt_text, fields = load_character_prompt(txt_path)
-        if not prompt_text and not fields and os.path.isfile(json_path):
-            _, fields = load_character_prompt(json_path)
-        if not prompt_text and not fields:
-            raise SystemExit(f"missing char prompt for {cid}: {txt_path} (or .json)")
-        ref_names, prompt_text = ip.parse_ref_images(prompt_text)
-        ref_urls = ip.resolve_ref_names(reg, ref_names) if ref_names else None
-        print(f"  char sheet {cid}: generating (refs: {ref_names}) ...")
-        ip.generate_character_sheet(reg, cid, prompt_text=prompt_text, character_fields=fields, ref_urls=ref_urls)
+        prompt_text = builder(character, render_style=render_style)
+        print(f"  char {variant} sheet {cid}: generating ...")
+        ip.generate_character_variant_sheet(reg, cid, variant, prompt_text=prompt_text, ref_urls=[identity_url])
 
     for lid in lids:
         l_path = reg.location_path(lid)

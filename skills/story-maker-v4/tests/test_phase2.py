@@ -26,9 +26,10 @@ def test_scene_count_for_target():
 
 
 def test_generation_count_for_scene():
-    assert db.generation_count_for_scene(70) == 5   # ceil(70/15)
+    assert db.generation_count_for_scene(70) == 4   # ceil(70/20)
     assert db.generation_count_for_scene(15) == 1
-    assert db.generation_count_for_scene(16) == 2
+    assert db.generation_count_for_scene(16) == 1
+    assert db.generation_count_for_scene(21) == 2
     assert db.generation_count_for_scene(0) == 0
 
 
@@ -198,16 +199,16 @@ def test_validate_storyboard_pass():
     assert res.ok, res.errors
 
 
-def test_validate_storyboard_catches_over_15s_generation():
-    bad = STORYBOARD_MD.replace("## Generation g1 — 0.0-15.0s", "## Generation g1 — 0.0-16.0s") \
-                       .replace("duration_seconds: 15.0", "duration_seconds: 16.0") \
-                       .replace("### Shot 2 — 7.2-15.0s (hard_cut)", "### Shot 2 — 7.2-16.0s (hard_cut)") \
-                       .replace("## Generation g2 — 15.0-27.0s", "## Generation g2 — 16.0-27.0s") \
-                       .replace("### Shot 1 — 15.0-27.0s (continuous)", "### Shot 1 — 16.0-27.0s (continuous)") \
-                       .replace("duration_seconds: 12.0", "duration_seconds: 11.0")
+def test_validate_storyboard_catches_over_20s_generation():
+    bad = STORYBOARD_MD.replace("## Generation g1 — 0.0-15.0s", "## Generation g1 — 0.0-21.0s") \
+                       .replace("duration_seconds: 15.0", "duration_seconds: 21.0") \
+                       .replace("### Shot 2 — 7.2-15.0s (hard_cut)", "### Shot 2 — 7.2-21.0s (hard_cut)") \
+                       .replace("## Generation g2 — 15.0-27.0s", "## Generation g2 — 21.0-27.0s") \
+                       .replace("### Shot 1 — 15.0-27.0s (continuous)", "### Shot 1 — 21.0-27.0s (continuous)") \
+                       .replace("duration_seconds: 12.0", "duration_seconds: 6.0")
     res = validators.validate_storyboard(bad)
     assert not res.ok
-    assert any("15s per generation" in e or "outside [5,15]" in e for e in res.errors)
+    assert any("20s per generation" in e or "outside [5,20]" in e for e in res.errors)
 
 
 def test_validate_storyboard_catches_shot_straddling_boundary():
@@ -1165,6 +1166,116 @@ def test_new_information_rule_ok_with_different_shot_size():
     assert not any("shares the same characters" in w for w in res.warnings)
 
 
+def _make_two_gen_storyboard(g2_shots: str) -> str:
+    """Build a valid two-generation storyboard; g1 always has 3 shots."""
+    return textwrap.dedent(f"""
+        # Scene s1 — Test
+        scene_id: s1
+        target_seconds: 30
+        cast: [char_01]
+        location_ref_id: loc_test
+
+        ## Generation g1 — 0.0-15.0s
+        duration_seconds: 15.0
+        panel_grid: 2x3
+
+        ### Shot 1 — 0.0-4.0s (continuous)
+        panels: [1, 2]
+        characters_present: [char_01]
+        acting_beat: approach → reach → grasp
+        layout: centered subject over depth layers
+        screen_direction: left_to_right
+        action: Char walks forward.
+        camera: Tracking Shot with small amplitude at slow speed.
+        audio: Footsteps.
+
+        ### Shot 2 — 4.0-9.0s (hard_cut)
+        panels: [3, 4]
+        characters_present: [char_01]
+        acting_beat: pause → look up → smile
+        layout: low-angle subject against open sky
+        screen_direction: held
+        action: Char stops and looks up.
+        camera: Tilt Up with small amplitude at slow speed.
+        audio: Wind, birds.
+
+        ### Shot 3 — 9.0-15.0s (audio_led)
+        panels: [5, 6]
+        characters_present: [char_01]
+        acting_beat: call → answer → settle
+        layout: wide subject small in landscape
+        screen_direction: held
+        action: Char waves toward the distance.
+        camera: Arc Shot with small amplitude at slow speed.
+        audio: Distant call.
+
+        ## Generation g2 — 15.0-30.0s
+        duration_seconds: 15.0
+        panel_grid: 2x3
+{g2_shots}
+        ## Scene-end handoff -> scene s2
+        on_screen: [char_01]
+        mood: calm
+        transition: hard_cut
+    """).strip()
+
+
+def test_uniform_shot_count_across_generations_warns():
+    """3 shots in g1 AND 3 shots in g2 (different durations) → uniform-count warning."""
+    g2_shots = """
+        ### Shot 1 — 15.0-19.0s (continuous)
+        panels: [1, 2]
+        characters_present: [char_01]
+        acting_beat: approach → reach → grasp
+        layout: centered subject over depth layers
+        screen_direction: left_to_right
+        action: Char approaches the gate.
+        camera: Push In with small amplitude at slow speed.
+        audio: Gate creak.
+
+        ### Shot 2 — 19.0-25.0s (hard_cut)
+        panels: [3, 4]
+        characters_present: [char_01]
+        acting_beat: enter → pause → look
+        layout: doorway framing with deep background
+        screen_direction: held
+        action: Char steps through and pauses.
+        camera: Tracking Shot with small amplitude at slow speed.
+        audio: Echoing steps.
+
+        ### Shot 3 — 25.0-30.0s (match_cut)
+        panels: [5, 6]
+        characters_present: [char_01]
+        acting_beat: see → react → settle
+        layout: close subject over blurred depth
+        screen_direction: held
+        action: Char sees the vista and reacts.
+        camera: Arc Shot with small amplitude at slow speed.
+        audio: Swelling ambience.
+"""
+    res = validators.validate_storyboard(_make_two_gen_storyboard(g2_shots))
+    assert res.ok, res.errors
+    assert any("uniform shot-count" in w for w in res.warnings)
+
+
+def test_varied_shot_count_across_generations_no_warning():
+    """3 shots in g1 but only 1 shot (oner) in g2 → no uniform-count warning."""
+    g2_shots = """
+        ### Shot 1 — 15.0-30.0s (continuous)
+        panels: [1, 2, 3, 4, 5, 6]
+        characters_present: [char_01]
+        acting_beat: enter → wander → discover → settle
+        layout: sustained master staging across depth layers
+        screen_direction: held
+        action: Char crosses the hall in one unbroken take.
+        camera: Tracking Shot with small amplitude at slow speed.
+        audio: Footsteps, hall tone.
+"""
+    res = validators.validate_storyboard(_make_two_gen_storyboard(g2_shots))
+    assert res.ok, res.errors
+    assert not any("uniform shot-count" in w for w in res.warnings)
+
+
 # --- animation direction + sound design (Phase 2) ---------------------------
 
 def test_action_with_micro_beats_accepted():
@@ -1941,7 +2052,7 @@ def test_validate_critique_report_has_fails():
     from tools.critique_validator import validate_critique_report
     res = validate_critique_report(FAIL_CRITIQUE_REPORT, question_bank_md=SAMPLE_QUESTION_BANK)
     assert not res.ok
-    assert any("FAIL" in e for e in res.errors)
+    assert any("BLOCKER" in e or "FAIL" in e for e in res.errors)
 
 
 def test_validate_critique_report_missing_question():
@@ -1973,7 +2084,7 @@ def test_validate_critique_report_missing_question():
 
 
 def test_validate_critique_report_count_mismatch():
-    """Summary counts not matching actual statuses should error."""
+    """Summary counts not matching actual statuses should warn."""
     from tools.critique_validator import validate_critique_report
     mismatched = textwrap.dedent("""
         # Critique Report — Test
@@ -2003,9 +2114,8 @@ def test_validate_critique_report_count_mismatch():
         - Notes: Yes.
     """).strip()
     res = validate_critique_report(mismatched, question_bank_md=SAMPLE_QUESTION_BANK)
-    # Summary says Fail: 0 but there's 1 FAIL → mismatch
-    assert not res.ok
-    assert any("Fail" in e and "!=" in e for e in res.errors)
+    # Summary says Fail: 0 but there's 1 FAIL → mismatch produces warning
+    assert any("Fail" in w and "!=" in w for w in res.warnings)
 
 
 def test_build_character_sheet_prompt_realistic():
@@ -2055,6 +2165,7 @@ def test_validate_storyboard_single_shot_master_oner_passes():
         acting_beat: slide entry → banking turn → safe landing
         layout: limestone chute banking left to right, character centered in frame
         screen_direction: left_to_right
+        motion_profile: ease_in_out, on_ones, follow_through
         action: Unbroken continuous master take: Ethan slides down the twisting limestone chute, banking high on the curves.
         camera: Tracking Shot moving parallel to Ethan at fast speed.
         audio: Whooshing cavern air, friction on stone, joyful echo.
@@ -2093,6 +2204,7 @@ def test_validate_storyboard_asymmetric_shots_passes():
         acting_beat: slow advance → determined halt → firm demand
         layout: Ethan stands grounded foreground right
         screen_direction: left_to_right
+        motion_profile: ease_in_out, on_twos
         action: Ethan steps forward deliberately across the stone floor, coming to a firm stop with hands on his hips.
         camera: Tracking Shot slowly moving toward Ethan.
         audio: Heavy deliberate boots on stone, echoing hall ambience.
@@ -2108,6 +2220,7 @@ def test_validate_storyboard_asymmetric_shots_passes():
         acting_beat: breath caught → blinking shock → nod
         layout: Lily framed center, soft light on face
         screen_direction: right_to_left
+        motion_profile: ease_out, on_twos, secondary_motion
         action: Lily blinks in sudden surprise, her expression softening into an understanding nod.
         camera: Push In fast on Lily's face.
         audio: Soft gasp, quiet breathing.

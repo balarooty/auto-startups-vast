@@ -11,7 +11,7 @@ No LLM calls. Pure parsing + assertions.
 Schemas enforced:
   scenes        -> scene_count>=1; each scene has scene_id/target_seconds/cast/location_id;
                    sum(targets) ~= run target.
-  storyboard    -> scene split into generations (each 5-15s, contiguous, sum ==
+  storyboard    -> scene split into generations (each 5-20s, contiguous, sum ==
                    target_seconds); shots contiguous within each generation and
                    NEVER straddling a generation boundary; panels sequential
                    (column-major: top-to-bottom within each column, then
@@ -110,6 +110,31 @@ FOCUS_TYPES = (
     "deep_focus",
     "rack_focus",
     "soft_focus",
+)
+
+# Animation motion-profile vocabulary (see assets/cinematography-bible.md Section G).
+# Per-shot `motion_profile:` — comma list of easing, cadence, and principle terms.
+# Terms with the `_easing` suffix group are mutually exclusive within a shot;
+# terms with the `_cadence` suffix group are mutually exclusive within a shot.
+MOTION_PROFILE_TERMS = (
+    # easing (slow in / slow out) — pick at most one
+    "ease_in", "ease_out", "ease_in_out", "linear", "snap",
+    # cadence (timing on ones/twos) — pick at most one
+    "on_ones", "on_twos", "hold",
+    # principle flags — freely combinable
+    "follow_through", "overlapping", "secondary_motion",
+)
+
+_MOTION_EASING_TERMS = ("ease_in", "ease_out", "ease_in_out", "linear", "snap")
+_MOTION_CADENCE_TERMS = ("on_ones", "on_twos", "hold")
+
+# Action verbs that demand a follow-through / settle beat (warn-only heuristic).
+_FOLLOW_THROUGH_ACTION_WORDS = (
+    "jump", "leap", "hop", "slam", "slams", "crash", "crashes", "land", "lands",
+    "landing", "throw", "throws", "thrown", "kick", "kicks", "punch", "punches",
+    "hit", "hits", "swing", "swings", "dive", "dives", "fall", "falls", "drop",
+    "drops", "burst", "bursts", "smash", "smashes", "impact", "bounce", "bounces",
+    "sprint", "sprints", "bolt", "bolts", "lunge", "lunges", "spin", "spins",
 )
 
 # Suggested emotion vocabulary for beat boards (warn-only — not enforced).
@@ -408,6 +433,7 @@ def parse_storyboard(md: str) -> dict[str, Any]:
             "screen_direction": kv.get("screen_direction", "").strip().lower(),
             "camera_angle": kv.get("camera_angle", "").strip().lower(),
             "focus": kv.get("focus", "").strip().lower(),
+            "motion_profile": [s.strip().lower() for s in kv.get("motion_profile", "").split(",") if s.strip()],
         })
         cur_gen["shots"].append(cur_shot)
         cur_shot = None
@@ -570,6 +596,24 @@ def validate_scenes(
             res.warn(
                 f"beats {sorted(uncovered)} are not covered by any scene"
             )
+
+    # Cross-check style_bible.md if it exists beside scenes.md
+    if beat_board_path:
+        sb_path = os.path.join(os.path.dirname(beat_board_path), "style_bible.md")
+        if os.path.isfile(sb_path):
+            bible = parse_style_bible(open(sb_path, encoding="utf-8").read())
+            donts = [d.lower() for d in bible.get("donts", [])]
+            palette_scenes = {p.get("scene_id") for p in bible.get("palette", [])}
+            for sc in scenes:
+                sid = sc["scene_id"]
+                if palette_scenes and sid not in palette_scenes:
+                    res.warn(f"scene {sid}: no palette_script entry in style_bible.md")
+                style_text = (sc.get("style_target", "") + " " + sc.get("visual_motif", "")).lower()
+                for d in donts:
+                    if d and d in style_text:
+                        res.warn(
+                            f"scene {sid}: style_target/visual_motif mentions a style_bible DON'T ({d!r})"
+                        )
 
     return res
 
@@ -736,6 +780,34 @@ def validate_storyboard(md: str, scenes: dict[str, Any] | None = None) -> Valida
                     "rack focus typically requires medium, full, or wide staging across multiple planes"
                 )
 
+            # motion_profile validation (optional but encouraged — the animation craft layer)
+            mp = shot.get("motion_profile", [])
+            for term in mp:
+                if term not in MOTION_PROFILE_TERMS:
+                    res.error(f"{slabel}: motion_profile term {term!r} not in {MOTION_PROFILE_TERMS}")
+            if not mp:
+                res.warn(f"{slabel}: missing 'motion_profile:' (encouraged for animation craft — see cinematography-bible Section G)")
+            else:
+                easings = [t for t in mp if t in _MOTION_EASING_TERMS]
+                if len(easings) > 1:
+                    res.error(f"{slabel}: motion_profile has multiple easing terms {easings} — pick one")
+                cadences = [t for t in mp if t in _MOTION_CADENCE_TERMS]
+                if len(cadences) > 1:
+                    res.error(f"{slabel}: motion_profile has multiple cadence terms {cadences} — pick one")
+
+            # follow-through heuristic: impact/leap action without follow_through
+            _action_l = shot.get("action", "").lower()
+            if (
+                mp
+                and "follow_through" not in mp
+                and any(w in _action_l for w in _FOLLOW_THROUGH_ACTION_WORDS)
+            ):
+                res.warn(
+                    f"{slabel}: action has an impact/leap verb but motion_profile lacks "
+                    "'follow_through' — physical actions need a settle/overshoot beat "
+                    "(see cinematography-bible Section G)"
+                )
+
             if not shot["action"]:
                 res.error(f"{slabel}: missing 'action:'")
             if not shot["camera"]:
@@ -854,6 +926,16 @@ def validate_storyboard(md: str, scenes: dict[str, Any] | None = None) -> Valida
 
     if sb["target_seconds"] > 0 and abs(total - sb["target_seconds"]) > eps:
         res.error(f"scene {sid}: generations cover {total:.1f}s != target_seconds ({sb['target_seconds']}s)")
+
+    # Anti-mechanical pacing: uniform shot count across generations
+    # (e.g. every generation = 3 shots) is static pacing even when durations vary.
+    gen_shot_counts = [len(g["shots"]) for g in gens]
+    if len(gens) >= 2 and len(set(gen_shot_counts)) == 1:
+        res.warn(
+            f"scene {sid}: every generation uses exactly {gen_shot_counts[0]} shots — "
+            "uniform shot-count pacing is mechanical; vary shot count by dramatic necessity "
+            "(1-shot master oner, asymmetric 2-shot dynamic, 3-shot arc, 4+ montage)."
+        )
 
     # Anti-mechanical slicing across generations in a scene
     # ponytail: O(N) duration spread scan to prevent uniform slicing across scenes
@@ -1835,8 +1917,8 @@ def validate_render_manifest(manifest_path: str, run_dir: str | None = None) -> 
                     res.error(f"{tag}: video prompt sha256 mismatch (manifest={prompt_hash[:10]}, actual={actual_hash[:10]})")
 
         dur = gen.get("duration_seconds", 0.0)
-        if dur < 4.9 or dur > 15.1:
-            res.warn(f"{tag}: duration {dur}s outside normal 5-15s bounds")
+        if dur < 4.9 or dur > duration_budget.GEN_MAX + 0.1:
+            res.warn(f"{tag}: duration {dur}s outside normal 5-{duration_budget.GEN_MAX:.0f}s bounds")
 
     return res
 
@@ -1996,6 +2078,183 @@ def validate_screenplay(md: str) -> ValidationResult:
 
 
 # ---------------------------------------------------------------------------
+# Phase 2 — style_bible / sound_map / timing_sheet
+# ---------------------------------------------------------------------------
+
+_STYLE_BIBLE_SECTIONS = (
+    "production_target",
+    "palette_script",
+    "shape_language",
+    "line_weight",
+    "background_treatment",
+    "lighting_rules",
+    "texture_grain",
+)
+
+
+def parse_style_bible(md: str) -> dict[str, Any]:
+    """Parse style_bible.md -> {fields, palette:[{scene_id,colors}], donts:[...]}."""
+    kv = _kv_lines(md)
+    fields = {k: kv.get(k, "").strip() for k in _STYLE_BIBLE_SECTIONS}
+    palette: list[dict[str, str]] = []
+    donts: list[str] = []
+    section = None
+    for raw in md.splitlines():
+        line = raw.strip()
+        low = line.lower()
+        if low.startswith("## "):
+            section = low
+            continue
+        if section and "palette" in section and line.startswith("- "):
+            m = re.search(r"scene_id:\s*([A-Za-z0-9_]+)", line)
+            palette.append({"scene_id": m.group(1) if m else "", "colors": line})
+        if section and ("don" in section or "dont" in section or "do_not" in section):
+            if line.startswith("- "):
+                donts.append(line.lstrip("- ").strip())
+    return {"fields": fields, "palette": palette, "donts": donts}
+
+
+def validate_style_bible(md: str, scenes: dict[str, Any] | None = None) -> ValidationResult:
+    res = ValidationResult()
+    data = parse_style_bible(md)
+    for k in _STYLE_BIBLE_SECTIONS:
+        if not data["fields"].get(k):
+            res.error(f"style_bible: missing required field '{k}'")
+    if not data["palette"]:
+        res.error("style_bible: palette_script must list at least one scene entry")
+    if not data["donts"]:
+        res.warn("style_bible: DO/DON'T list is empty — add explicit exclusions")
+    if scenes and scenes.get("scenes"):
+        palette_scenes = {p["scene_id"] for p in data["palette"] if p["scene_id"]}
+        for sc in scenes["scenes"]:
+            if sc["scene_id"] not in palette_scenes:
+                res.warn(f"style_bible: no palette entry for scene {sc['scene_id']}")
+    return res
+
+
+def parse_sound_map(md: str) -> dict[str, Any]:
+    """Parse sound_map.md -> {scenes:{sid:{...}}, motifs:{cid:line}, arc:str}."""
+    scenes: dict[str, dict[str, str]] = {}
+    motifs: dict[str, str] = {}
+    arc = ""
+    cur_scene = None
+    section = None
+    for raw in md.splitlines():
+        line = raw.strip()
+        low = line.lower()
+        if low.startswith("## "):
+            section = low
+            m = re.match(r"##\s*scene\s+([A-Za-z0-9_]+)", low)
+            cur_scene = m.group(1) if m else None
+            if cur_scene:
+                scenes.setdefault(cur_scene, {})
+            continue
+        if cur_scene and ":" in line and not line.startswith("##"):
+            k, _, v = line.partition(":")
+            scenes[cur_scene][k.strip().lower()] = v.strip()
+        elif section and "motif" in section and ":" in line and line.startswith("- "):
+            body = line.lstrip("- ")
+            k, _, v = body.partition(":")
+            motifs[k.strip()] = v.strip()
+        elif section and ("arc" in section or "music arc" in section) and line and not line.startswith("#"):
+            arc += line + " "
+    return {"scenes": scenes, "motifs": motifs, "arc": arc.strip()}
+
+
+def validate_sound_map(md: str, scenes: dict[str, Any] | None = None) -> ValidationResult:
+    res = ValidationResult()
+    data = parse_sound_map(md)
+    if not data["scenes"]:
+        res.error("sound_map: no '## Scene <id>' blocks parsed")
+    if not data["arc"]:
+        res.warn("sound_map: music arc is empty — define the episode's score arc")
+    if scenes and scenes.get("scenes"):
+        all_cids: set[str] = set()
+        for sc in scenes["scenes"]:
+            all_cids.update(sc.get("cast", []))
+            if sc["scene_id"] not in data["scenes"]:
+                res.error(f"sound_map: no entry for scene {sc['scene_id']}")
+            else:
+                entry = data["scenes"][sc["scene_id"]]
+                for key in ("ambience", "motif", "music"):
+                    if not entry.get(key):
+                        res.warn(f"sound_map scene {sc['scene_id']}: missing '{key}:' line")
+        for cid in sorted(all_cids):
+            if cid not in data["motifs"]:
+                res.warn(f"sound_map: no leitmotif for character {cid}")
+    return res
+
+_TIMING_ROW_RE = re.compile(
+    r"^\|\s*([\d.]+)\s*\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*)\|"
+)
+
+
+def parse_timing_sheet(md: str) -> dict[str, Any]:
+    """Parse a timing sheet -> {rows:[{t,dialogue,action,camera,sound}], duration}."""
+    rows: list[dict[str, Any]] = []
+    duration = 0.0
+    m = re.search(r"duration_seconds:\s*([\d.]+)", md)
+    if m:
+        duration = float(m.group(1))
+    for line in md.splitlines():
+        rm = _TIMING_ROW_RE.match(line.strip())
+        if rm:
+            try:
+                t = float(rm.group(1))
+            except ValueError:
+                continue
+            rows.append({
+                "t": t,
+                "dialogue": rm.group(2).strip(),
+                "action": rm.group(3).strip(),
+                "camera": rm.group(4).strip(),
+                "sound": rm.group(5).strip(),
+            })
+    return {"rows": rows, "duration": duration}
+
+
+def validate_timing_sheet(md: str, *, gen_duration: float | None = None) -> ValidationResult:
+    res = ValidationResult()
+    data = parse_timing_sheet(md)
+    rows = data["rows"]
+    if not rows:
+        res.error("timing_sheet: no timing rows parsed (expected a markdown table)")
+        return res
+    times = [r["t"] for r in rows]
+    if times != sorted(times):
+        res.error("timing_sheet: rows are not in ascending time order")
+    dur = gen_duration or data["duration"]
+    if dur <= 0:
+        res.warn("timing_sheet: no duration_seconds declared and none provided")
+    else:
+        if times and times[0] > 0.5:
+            res.warn(f"timing_sheet: first row starts at {times[0]}s — cover from 0.0s")
+        gaps = [b - a for a, b in zip(times, times[1:])]
+        if any(g > 0.6 for g in gaps):
+            res.warn("timing_sheet: some rows are more than ~0.5s apart (aim for 0.5s granularity)")
+        if times and (dur - times[-1]) > 0.6:
+            res.warn(f"timing_sheet: last row at {times[-1]}s does not reach the generation end ({dur}s)")
+    WORDS_PER_SEC = 2.5
+    for i, r in enumerate(rows):
+        dlg = r["dialogue"]
+        if not dlg or dlg in ("-", "—", "None"):
+            continue
+        words = len(re.findall(r"[A-Za-z']+", dlg))
+        if words == 0:
+            continue
+        end = rows[i + 1]["t"] if i + 1 < len(rows) else (dur or r["t"] + 1.0)
+        avail = max(end - r["t"], 0.1)
+        if words / avail > WORDS_PER_SEC:
+            res.error(
+                f"timing_sheet @ {r['t']}s: {words} words in {avail:.1f}s exceeds "
+                f"~{WORDS_PER_SEC} words/sec — split the line or extend the shot"
+            )
+    return res
+
+
+
+
+# ---------------------------------------------------------------------------
 # Dispatch (used by scripts/validate.py)
 # ---------------------------------------------------------------------------
 
@@ -2021,6 +2280,20 @@ def validate(artifact_path: str, schema: str, *, target_seconds: int | None = No
         return validate_screenplay(text)
     if schema == "beat_board":
         return validate_beat_board(text, target_seconds=target_seconds)
+    if schema == "style_bible":
+        scenes = None
+        sp = scenes_path or (os.path.join(run_dir, "scenes.md") if run_dir else None)
+        if sp and os.path.isfile(sp):
+            scenes = parse_scenes(open(sp, encoding="utf-8").read())
+        return validate_style_bible(text, scenes=scenes)
+    if schema == "sound_map":
+        scenes = None
+        sp = scenes_path or (os.path.join(run_dir, "scenes.md") if run_dir else None)
+        if sp and os.path.isfile(sp):
+            scenes = parse_scenes(open(sp, encoding="utf-8").read())
+        return validate_sound_map(text, scenes=scenes)
+    if schema == "timing_sheet":
+        return validate_timing_sheet(text, gen_duration=None)
     if schema == "scenes":
         beat_board_path = None
         if run_dir:

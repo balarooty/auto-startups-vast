@@ -53,7 +53,7 @@ agents use to choose shot size, camera movement, composition, pacing, and sound.
 
 ### Pacing
 Event density per beat drives pacing:
-- **Tender/dialogue beats**: 6-15s in a single shot, camera breathing with the action
+- **Tender/dialogue beats**: 6-20s in a single shot, camera breathing with the action
 - **Action beats**: 1.5-3s micro-shots, cuts on action, sound driving each cut
 - **Reveal beats**: hold longer than comfortable, then cut on the reaction
 

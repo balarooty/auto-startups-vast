@@ -86,6 +86,9 @@ REPLICATE_OUTPUT_COMPRESSION = int(os.getenv("REPLICATE_OUTPUT_COMPRESSION", "90
 # (e.g. 2048x1152, 1152x2048). Prefer pixel enums to lock resolution.
 CHARACTER_SHEET_SIZE = os.getenv("CHARACTER_SHEET_SIZE", "3840x2160")
 BACKGROUND_IMAGE_SIZE = os.getenv("BACKGROUND_IMAGE_SIZE", "3840x2160")
+# Phase 2: also generate per-character expression + pose performance sheets
+# (derived from the identity sheet). Disable to skip the extra image spend.
+BUILD_CHARACTER_VARIANT_SHEETS = os.getenv("BUILD_CHARACTER_VARIANT_SHEETS", "1").lower() not in ("0", "false", "off", "no")
 # One storyboard sheet per Minimax generation: a clean landscape panel grid
 # (no text, no timecodes) attached verbatim as the Minimax reference image.
 # 3840x2160 (4K) — file size kept small via output_format=webp + output_compression.

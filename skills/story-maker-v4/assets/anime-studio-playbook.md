@@ -47,14 +47,14 @@ with emotion (cold blue enclosure → warm gold opening, circles → sharp angle
 
 ## 4. Anime timing grammar
 
-H3 has 5–15 seconds. Treat each generation like a tiny animation sequence:
+H3 has 5–20 seconds. Treat each generation like a tiny animation sequence:
 
 - **Hold → burst → reaction** for action beats.
 - **Hold → micro-expression → line** for dialogue beats.
 - **Establish → intrusion → response** for reveals.
 - **Anticipation → contact → follow-through → settle** for physical beats.
 
-Use 3–5 shots per 15s generation by default. Dense 6+ shot montages are only for
+Use 3–5 shots per generation by default. Dense 6+ shot montages are only for
 chaos, panic, or rhythmic comedy. Do not cut when a camera move or pose change
 communicates the same beat.
 

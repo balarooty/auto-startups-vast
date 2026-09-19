@@ -6,7 +6,7 @@ episode's final state when this is episode 2+). Never author a storyboard
 without that context loaded — Minimax prompts say things like "Continue
 directly from the previous scene", so you must know exactly what that was.
 **Output:** `<run_dir>/storyboard_<scene>.md` for each scene — the scene split
-into **generations** (one Minimax H3 render each, max 15s) and **shots**.
+into **generations** (one Minimax H3 render each, max 20s) and **shots**.
 Then run
 `python3 scripts/validate.py storyboard_<scene>.md --schema storyboard --scenes-path <run_dir>/scenes.md`
 and fix until it passes.
@@ -28,12 +28,12 @@ this automatically.
 Split one scene's timeline into **generations**: each generation is ONE
 Minimax H3 render, driven by ONE storyboard sheet (clean panel grid) plus a
 timeline prompt. Inside a generation you plan **shots** (continuous camera
-takes separated by hard cuts). Minimax renders at most **15 seconds** per
+takes separated by hard cuts). Minimax renders at most **20 seconds** per
 generation — that is the load-bearing constraint of this whole plan.
 
 ## The 15-second rule (load-bearing)
 
-- A generation's duration is **5.0–15.0s**. Never more.
+- A generation's duration is **5.0–20.0s**. Never more.
 - **A shot must NEVER straddle a generation boundary.** If the next shot does
   not fit in the remaining seconds of the current generation, close this
   generation early (>= 5s) and move the whole shot to the next generation.
@@ -71,17 +71,17 @@ as a `ref_video`. This means:
 - **Dynamic Shot Depth & Story-First Pacing (MANDATORY)**: Before assigning cuts, the Director
   must analyze the scene beats, dialogue, and physical choreography to determine
   the natural dramatic pacing and shot depth:
-  * **1-Shot Master Take / Oner (10.0s – 15.0s)**: When the narrative beat is a continuous
+  * **1-Shot Master Take / Oner (10.0s – 20.0s)**: When the narrative beat is a continuous
     physical sequence (e.g., continuous sliding down a cavern, sovereign entrance, unbroken
     falling action, high-stakes continuous tracking, or sustained emotional dialogue), the shot
-    **MUST NOT be cut**. Author it as an unbroken single-shot Master Take (10.0–15.0s) filling
+    **MUST NOT be cut**. Author it as an unbroken single-shot Master Take (10.0–20.0s) filling
     the entire generation.
-  * **Asymmetric 2-Shot Dynamic (2 shots per 15s)**: Unequal dramatic division based on
+  * **Asymmetric 2-Shot Dynamic (2 shots per generation)**: Unequal dramatic division based on
     action/reaction or statement/rebuttal (e.g. 11.5s setup + 3.5s punchy reaction reveal;
     9.0s statement + 6.0s rebuttal; 5.0s confrontation + 10.0s lethal whisper and freeze).
-  * **Dynamic Action Arc (3 shots per 15s)**: High-stakes physical sequences with varying tempo
+  * **Dynamic Action Arc (3 shots per generation)**: High-stakes physical sequences with varying tempo
     (e.g. 6.0s drift/approach + 2.5s shock impact + 6.5s smoke/standoff).
-  * **Rapid Montage (4+ shots per 15s)**: Reserved strictly for high-tempo preparation,
+  * **Rapid Montage (4+ shots per generation)**: Reserved strictly for high-tempo preparation,
     chaotic impacts, or rapid flashbacks.
   * **STRICT PROHIBITION**: Never mechanically slice every generation into arbitrary equal intervals
     (e.g. 2 equal 7.5s slices or 4 equal 3.75s slices). Never default blindly to 2 shots per generation
@@ -94,7 +94,7 @@ as a `ref_video`. This means:
   * Dialogue must move forward with every cut. Never repeat the same blame, accusation, or question across consecutive shots (e.g., do not repeat "He broke it! / No, he broke it!" when a parent enters after an argument).
   * **Authority Arrival Pivot:** When an authority figure enters, immediately pivot the dialogue from mutual squabbling to a shared plea, appeal, excuse, or silence, allowing the newcomer to deliver a knowing, witty response ("I know what you two really want") that triggers the resolution.
 - **10-Second Commercial Button Formula (for Branded Stories/Ads)**:
-  * Structure commercial button generations (10.0–15.0s total) for maximum brand elegance and authentic swagger:
+  * Structure commercial button generations (10.0–20.0s total) for maximum brand elegance and authentic swagger:
     - **Shot 1 (Setup & Hook, 2.0–3.0s)**: Characters reacting, smelling food, or locking eyes with the hero product.
     - **Shot 2 (Authentic Slogan / Maternal Swagger, 5.0–7.0s)**: Speaker delivers the core tagline/motto in natural, regional vernacular inside `dialogue:` with confident posture and warm lighting.
     - **Shot 3 (Sensory Crunch / Brand Button, 3.0–5.0s)**: Close-up on the hero product/satisfying crunch, beaming smile, and held brand tableau.
@@ -214,16 +214,16 @@ Animation principles to apply:
 - **Secondary motion**: cloth, hair, ears, tail follow the primary action with delay
 
 - **Scene, Generation & Panel Grid Relationship**:
-  * A standard 30-second scene is executed through **two 15s video generations** (`g1` and `g2`),
+  * A standard 30-second scene is executed through **two video generations (e.g. 15s + 15s)** (`g1` and `g2`),
     anchored by a 6-panel storyboard sheet (`storyboard_sheet.txt`, grid `3x2` or `2x3`).
   * Panels 1, 2, 3 (left column) anchor `g1`; Panels 4, 5, 6 (right column) anchor `g2`.
   * **Inside each generation, shot count and durations are dictated solely by narrative necessity**:
-    - **1-Shot Master Oner (10.0s–15.0s)**: Claims all panels allocated to that generation (e.g. `panels: [1, 2, 3]`
+    - **1-Shot Master Oner (10.0s–20.0s)**: Claims all panels allocated to that generation (e.g. `panels: [1, 2, 3]`
       for g1, or `[4, 5, 6]` for g2, or `[1, 2, 3, 4, 5, 6]` in a single-generation scene). The panels depict the
       shot's progressive milestones: opening staging, mid-take action peak, and concluding settling pose.
     - **Asymmetric 2-Shot**: Claims panels proportionally (e.g. Shot 1 gets `panels: [1, 2]`, Shot 2 gets `panels: [3]`).
     - **Dynamic 3-Shot Arc**: Each shot claims its dedicated panel (`panels: [1]`, `panels: [2]`, `panels: [3]`).
-  * **Strictly forbid defaulting to mechanical 2 shots per generation or 4 shots per scene.**
+  * **Strictly forbid defaulting to mechanical 2 shots per generation or 4 shots per scene — and equally forbid a uniform shot count across generations** (e.g. every generation using exactly 3 shots, even with varied durations, is static mechanical pacing). Adjacent generations should differ in shot count unless the dramatic beats genuinely repeat the same rhythm; the validator warns on uniform shot-count patterns.
 - **Dynamic Cinematography Rule (MANDATORY)**:
   * Every shot must have an intentional camera angle from the taxonomy:
     `eye_level`, `low_angle`, `high_angle`, `bird_eye`, `worm_eye`, `side_profile`,
@@ -314,6 +314,7 @@ acting_beat: reach for canvas → push aside → awestruck pause in gold light
 layout: curtain edge foreground, toddler left third, glowing egg deep midground
 screen_direction: left_to_right
 camera_angle: three_quarter
+motion_profile: ease_out, on_twos
 action: The toddler pushes aside a hanging canvas sheet; a golden light shaft illuminates a large speckled glowing egg.
 camera: Handheld whip pan right to reveal the glowing egg.
 audio: Fabric rustle, faint magical shimmer hum.
@@ -408,6 +409,23 @@ transition: hard_cut
   sees — expressions, physical beats, props — not inner thoughts.
 - **`dialogue`**: `cid: "line"` (comma-separate multiple). Leave empty when
   silent. Keep lines short — the model lip-syncs and voices them.
+- **`motion_profile`** (optional but encouraged): comma list of animation motion
+  terms — one easing (`ease_in`/`ease_out`/`ease_in_out`/`linear`/`snap`), one
+  cadence (`on_ones`/`on_twos`/`hold`), and any principle flags
+  (`follow_through`/`overlapping`/`secondary_motion`). See
+  [`assets/cinematography-bible.md`](../assets/cinematography-bible.md) Section
+  G-bis. The validator errors on unknown terms or two easings/cadences, warns
+  when the field is missing, and warns when an impact/leap `action:` lacks
+  `follow_through`.
+
+## Timing sheet (per generation)
+
+After the storyboard passes, author one
+`timing_sheet_<scene>_g<gen>.md` per generation per
+[`prompts/timing_sheet.md`](timing_sheet.md): the generation's 5–20s mapped to
+0.5s rows of dialogue-phoneme / action / camera / sound keys (the X-sheet
+analogue). Agent 5 compiles it into the video prompt. Validate each with
+`python3 scripts/validate.py timing_sheet_<scene>_g<gen>.md --schema timing_sheet --run-dir <run_dir>`.
 - **Handoff block:** `on_screen`, `mood`, `transition` (`hard_cut` |
   `match_cut`). For the LAST scene, still emit the block pointing at a
   sentinel (`-> scene end`).

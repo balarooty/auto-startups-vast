@@ -196,6 +196,10 @@ class AssetRegistry:
     def character_path(self, cid: str) -> str:
         return os.path.join(self.assets_dir, "characters", f"{cid}.{_img_ext()}")
 
+    def character_variant_path(self, cid: str, variant: str) -> str:
+        """Path for a derived character sheet (``expressions`` / ``poses``)."""
+        return os.path.join(self.assets_dir, "characters", f"{cid}_{variant}.{_img_ext()}")
+
     def location_path(self, lid: str) -> str:
         return os.path.join(self.assets_dir, "locations", f"{lid}.{_img_ext()}")
 
@@ -352,6 +356,41 @@ def generate_character_sheet(
         f"char sheet {cid}",
     )
     entry = registry.character(cid)
+    _registry_entry_from_result(entry, result)
+    registry.save()
+    return entry
+
+
+def generate_character_variant_sheet(
+    registry: AssetRegistry,
+    cid: str,
+    variant: str,
+    *,
+    prompt_text: str,
+    provider: str | None = None,
+    ref_urls: list[str] | None = None,
+) -> dict:
+    """Generate a derived character sheet (``expressions`` or ``poses``).
+
+    Stored under ``characters/<cid>_<variant>.<ext>`` and registered in the
+    ``characters`` table under the id ``<cid>_<variant>`` so it is resume-safe
+    and reusable across episodes. The identity sheet is passed as a reference.
+    """
+    backend = provider or config.get_character_sheet_image_provider()
+    vid = f"{cid}_{variant}"
+    out_path = registry.character_variant_path(cid, variant)
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    result = _check(
+        generate_grok_t2i(
+            prompt_text, out_path,
+            size=config.CHARACTER_SHEET_SIZE,
+            quality=config.REPLICATE_SHEET_QUALITY,
+            provider=backend,
+            ref_urls=ref_urls,
+        ),
+        f"char {variant} sheet {cid}",
+    )
+    entry = registry.character(vid)
     _registry_entry_from_result(entry, result)
     registry.save()
     return entry

@@ -4,7 +4,7 @@
 `<run_dir>/beat_board.md`, `<run_dir>/scenes.md`, all
 `<run_dir>/spatial_plan_sN.md` files (when they exist), all
 `<run_dir>/storyboard_sN.md` files — plus
-[`assets/directing-questions.md`](../assets/directing-questions.md) (the 200+
+[`assets/directing-questions.md`](../assets/directing-questions.md) (the 260+
 question bank).
 **Output:** `<run_dir>/critique_report.md` — a per-question evaluation report.
 Then run
@@ -32,7 +32,7 @@ it PASS, FAIL, or ADVISORY, with specific feedback.
 
 2. **Read the question bank.** Load
    [`assets/directing-questions.md`](../assets/directing-questions.md). There
-   are 235+ questions across 9 sections (Story, Shot Design, Camera,
+   are 260+ questions across 9 sections (Story, Shot Design, Camera,
    Composition, Editing, Animation, Sound & Dialogue, Spatial, and H3/anime production).
 
 3. **Evaluate each question with Severity Tiers.** For each question:

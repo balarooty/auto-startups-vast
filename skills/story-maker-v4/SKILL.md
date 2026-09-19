@@ -1,7 +1,7 @@
 ---
 name: story-maker-v4
-version: 4.2.0
-description: "Production-ready story-to-video skill where Claude Code authors and validates artifacts while Python runs deterministic media tasks. Video backend: MiniMax H3 R2V via ComfyUI — each 5–15s generation uses a storyboard sheet, structured Ref2VA prompt, native stereo audio, and bounded optional references. No panel crops or upscales."
+version: 4.3.0
+description: "Production-ready story-to-video skill where Claude Code authors and validates artifacts while Python runs deterministic media tasks. Video backend: MiniMax H3 R2V via ComfyUI — each 5–20s generation uses a storyboard sheet, structured Ref2VA prompt, native stereo audio, and bounded optional references. No panel crops or upscales."
 triggers:
   - story-maker-v4
   - story-maker v4
@@ -20,7 +20,7 @@ here — the model authoring every artifact is you.
 **V4 targets MiniMax H3 reference generation.** It preserves the V3 pipeline,
 adds a self-contained Ref2VA contract, H3 reference budgets, and an H3 pacing
 profile. H3 renders directly from a storyboard sheet; a generation is limited to
-**5–15 seconds**, so a shot that cannot finish inside the current generation
+**5–20 seconds**, so a shot that cannot finish inside the current generation
 moves — panels and all — to the next generation's storyboard.
 
 ## Architecture (brain / hands split)
@@ -32,7 +32,7 @@ moves — panels and all — to the next generation's storyboard.
 | Minimax H3 video render + concat | **Python background batch** | `scripts/render_all.py` → sequential render: each generation is conditioned on the previous generation's rendered tail (3s) via `ref_videos`, then concat. Hours — fire-and-forget |
 
 Locked chunking: **1 scene = N generations; 1 generation = 1 storyboard sheet =
-1 Minimax H3 render, 5-15s**. Each sheet is a clean panel grid (`panel_grid`,
+1 Minimax H3 render, 5-20s**. Each sheet is a clean panel grid (`panel_grid`,
 6-12 panels, column-major numbering, NO text/timecodes on the image). Default
 grid is `3x2` (3 rows × 2 columns). A shot never straddles a
 generation boundary. A ~70s scene ≈ 5 generations. Continuity between adjacent
@@ -125,6 +125,9 @@ not re-author or re-generate anything```
    ═══ GATE 1: user visually confirms all sheets + spatial_qa_report.md before continuing ═══
 6b. spatial_qa_report.md               (Claude, per scene)  — Agent 7  → validate --schema spatial_qa
    (PASS/WARN/BLOCKER escalation policy + sha256 tracking; BLOCKER halts GATE 1)
+6c. animatic_<scene>.mp4               (Python, per scene)   — build_animatic.py --scene <id>
+   (panel slideshow timed to shot durations + scratch audio; validates pacing, no paid render)
+   ═══ GATE 1.5: user confirms PACING/TIMING on the animatic before any video prompt/render ═══
 7. video_prompts/<scene>_<gen>.txt     (Claude vision, per generation) — Agent 5 → validate --schema video_prompt
    (discrepancy authority policy; 4-layer audio: dialogue, foley, ambience, music)
 7b. render_manifest.json               (Python)             — build_manifest.py --approve
@@ -142,7 +145,7 @@ fix the artifact and re-run until `ok:true`.
 ## Episode run order + human gates
 
 When a user requests an episode generation from a story, follow this order with
-**three human approval gates**. These are runbook rules — there is no code
+**four human approval gates**. These are runbook rules — there is no code
 enforcement. You (Claude) must stop and ask the user before proceeding.
 
 ```
@@ -156,6 +159,10 @@ Stage B-QA: Spatial QA inspects sheets against spatial plans (Agent 7, PASS/WARN
   ═══ GATE 1 ═══
   STOP. User visually confirms all sheets + spatial_qa_report.md before continuing.
   BLOCKER entries halt GATE 1. WARN is non-blocking.
+Stage B.5: Build animatics from sheets (build_animatic.py per scene; no paid render)
+  ═══ GATE 1.5 ═══
+  STOP. User confirms PACING/TIMING on animatic_<scene>.mp4 before any video prompt or paid render.
+  Pacing errors are cheapest to fix here and costliest at the render.
 Stage C: Video prompter authors video prompts from sheets (Agent 5)
 Stage C-Lock: Build approved render_manifest.json (build_manifest.py --approve)
   ═══ GATE 2 ═══
@@ -230,11 +237,11 @@ Before authoring spatial geography or storyboard boundaries, analyze the scene's
 dramatic beats, physical choreography, and dialogue tempo to establish the
 **Dynamic Shot Depth & Duration Plan**:
 - **Story-First Pacing Rule (MANDATORY)**:
-  * **1-Shot Master Take / Oner (10.0s–15.0s)**: When the narrative beat is a continuous physical sequence (continuous slide down a cavern, sovereign entrance, unbroken falling action, high-stakes continuous tracking, or sustained emotional dialogue), **DO NOT CUT**. Author it as an unbroken single-shot Master Take (10.0–15.0s) filling the generation.
-  * **Asymmetric 2-Shot Dynamic (2 shots per 15s)**: Unequal dramatic division based on action/reaction or statement/rebuttal (e.g. 11.5s setup + 3.5s reaction; 9.0s statement + 6.0s rebuttal; 5.0s confrontation + 10.0s lethal whisper and freeze).
-  * **Dynamic Action Arc (3 shots per 15s)**: High-stakes physical sequences with varying tempo (e.g. 6.0s drift/approach + 2.5s shock impact + 6.5s smoke/standoff).
-  * **Rapid Montage (4+ shots per 15s)**: Strictly reserved for high-tempo preparation, chaotic impacts, or rapid flashbacks.
-  * **STRICT PROHIBITION**: Never mechanically split generations into identical shot counts (e.g. defaulting to 2 shots per generation or 4 shots per scene) or arbitrary uniform slices (e.g. 2 × 7.5s or 4 × 3.75s). Mechanical slicing will trigger validator warnings.
+  * **1-Shot Master Take / Oner (10.0s–20.0s)**: When the narrative beat is a continuous physical sequence (continuous slide down a cavern, sovereign entrance, unbroken falling action, high-stakes continuous tracking, or sustained emotional dialogue), **DO NOT CUT**. Author it as an unbroken single-shot Master Take (10.0–20.0s) filling the generation.
+  * **Asymmetric 2-Shot Dynamic (2 shots per generation)**: Unequal dramatic division based on action/reaction or statement/rebuttal (e.g. 11.5s setup + 3.5s reaction; 9.0s statement + 6.0s rebuttal; 5.0s confrontation + 10.0s lethal whisper and freeze).
+  * **Dynamic Action Arc (3 shots per generation)**: High-stakes physical sequences with varying tempo (e.g. 6.0s drift/approach + 2.5s shock impact + 6.5s smoke/standoff).
+  * **Rapid Montage (4+ shots per generation)**: Strictly reserved for high-tempo preparation, chaotic impacts, or rapid flashbacks.
+  * **STRICT PROHIBITION**: Never mechanically split generations into identical shot counts (e.g. defaulting to 2 shots per generation or 4 shots per scene), never repeat a uniform shot count across generations (e.g. every generation using exactly 3 shots, even with varied durations), and never use arbitrary uniform slices (e.g. 2 × 7.5s or 4 × 3.75s). Mechanical slicing and uniform shot-count pacing will trigger validator warnings.
 - **Dynamic Cinematography Rule (MANDATORY)**:
   * Every shot must have an intentional camera angle (`low_angle`, `high_angle`, `worm_eye`, `bird_eye`, `side_profile`, `three_quarter`, `over_the_shoulder`, `dutch_angle`, `pov`, `reverse_shot`).
   * **Static eye-level framing repeated across cuts triggers an anti-monotony warning in the validator.**
@@ -262,15 +269,15 @@ to legacy behaviour (warning, not error).
 For each scene `sN`, author `$RUN/storyboard_sN.md` per
 [`prompts/storyboard_planner.md`](prompts/storyboard_planner.md) and
 [`assets/directors-guide.md`](assets/directors-guide.md): the scene split
-into `## Generation gK — a-b s` blocks (each 5-15s, contiguous, summing to the
+into `## Generation gK — a-b s` blocks (each 5-20s, contiguous, summing to the
 scene's `target_seconds`), each with `panel_grid` and `### Shot` blocks
 (contiguous, panels in reading order, Minimax camera vocabulary, audio +
 dialogue, `shot_size` + `composition` fields, 8-value transition grammar).
-**The 15s rule is load-bearing: a shot that does not fit in the
+**The 20s rule is load-bearing: a shot that does not fit in the
 current generation moves whole to the next one.**
 
 Shot durations must reflect the **Dynamic Shot Depth Plan** established in A3-Pre:
-shots range dynamically from 1.5s shock cuts to full 15.0s master takes, varying
+shots range dynamically from 1.5s shock cuts to full 20.0s master takes, varying
 rhythm naturally (fast-slow-fast, building tension, or sustained emotional hold).
 Every shot must enforce **multi-character prop ergonomics** (individual bowls/props in separate screen zones; never shared-bowl eating), **dialogue progression** (anti-repetition; authority arrival pivot), and **10-second commercial button structuring** where applicable.
 Then:
@@ -400,6 +407,31 @@ references like "Pixar". Do NOT proceed until the user explicitly says go.
 If a sheet is wrong, delete it and re-run `--scene sN`. Spatial QA WARN entries
 do not block GATE 1 but should be reviewed.
 
+## Stage B.5 — Animatic (Python; no paid render)
+
+Before any video prompt or paid render, build a cheap **animatic** per scene so
+the user can judge pacing and cut rhythm from the actual sheets and timings:
+
+```bash
+python3 scripts/build_animatic.py --output-dir "$RUN" --all
+```
+
+This slices each storyboard sheet into its panels (column-major, per
+`panel_grid`), holds each shot's first panel for its exact `start–end`
+duration, adds scratch audio (TTS for `dialogue:` lines, else a silent temp
+track), and writes `animatic_<scene>.mp4` plus a stitched `animatic_full.mp4`.
+It makes **no paid calls** and no LLM calls. (Requires `ffmpeg` on PATH; the
+builder reports and exits cleanly if it is missing.)
+
+**═══ GATE 1.5 ═══**
+
+STOP. Ask the user to watch `animatic_<scene>.mp4` / `animatic_full.mp4` and
+confirm the **pacing and timing** — does each beat hold long enough to read, do
+cuts land on the action, does the climax breathe? This is the cheapest point to
+fix rhythm: if a beat is rushed or a reveal lands flat, re-cut the shots in the
+storyboard and rebuild the animatic before spending on the render. Do NOT
+proceed to Stage C until the user explicitly approves the animatic.
+
 ## Stage C — Vision + video prompts (Claude authors; validate + fix each)
 
 ### C1. Author each generation's Ref2VA prompt (Agent 5)
@@ -491,7 +523,7 @@ Use `python3 -m tools.seam_report "$RUN"` to quantify seam jumps.
 1. **Never print credentials.** Do not echo `COMFYUI_AUTH`, `FAL_KEY`,
    `REPLICATE_API_TOKEN`, or slices of them. Probe ComfyUI reachability without
    printing the auth value.
-2. **15 seconds, period.** No generation may exceed 15s and no shot may straddle
+2. **20 seconds, period.** No generation may exceed 20s and no shot may straddle
    a generation boundary — the storyboard validator enforces both. When a scene's
    pacing fights the boundary, re-cut the shots, don't stretch the generation.
 3. **Storyboard sheets must be text-free.** The sheet goes to Minimax verbatim;
@@ -511,8 +543,9 @@ Use `python3 -m tools.seam_report "$RUN"` to quantify seam jumps.
    is an independent render: the sheet chain (previous sheet as reference) plus
    "Continue directly from the previous scene" prompt lines are what carry
    continuity. Keep the episode context loaded at all times.
-9. **Gates are mandatory.** GATE 1 (after sheets) and GATE 2 (after video
-   prompts, before render) are runbook rules. You must stop and ask the user.
+9. **Gates are mandatory.** GATE 0 (critique), GATE 1 (after sheets), GATE 1.5
+   (after animatics) and GATE 2 (after video prompts, before render) are
+   runbook rules. You must stop and ask the user.
 10. **Generations render sequentially.** Each generation after g1 is
     conditioned on the *rendered* tail (3s) of the previous generation, so
     they cannot render in parallel. Deleting a clip invalidates its tail ref
@@ -535,3 +568,8 @@ Use `python3 -m tools.seam_report "$RUN"` to quantify seam jumps.
     `extreme_wide` → isolation/scale; `low_angle` → power; `high_angle` →
     vulnerability. The `shot_size` field enables the definitive new-information
     check: without it, the validator can only warn.
+14. **Never render paid video before the animatic passes.** Pacing errors are
+    cheapest to fix at the animatic (GATE 1.5) and costliest at the render.
+    A storyboard that validates perfectly can still *feel* wrong in motion —
+    a beat rushed, a reveal landing flat, a cut rhythm that flattens. Build
+    `animatic_<scene>.mp4` first and get explicit pacing approval.

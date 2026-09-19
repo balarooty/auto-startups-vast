@@ -179,6 +179,22 @@ extras**. For `g1` (no previous sheet): **location → characters → extras**.
 The location panorama is attached for `g1` and for later generations whose
 spatial plan sets `location_reference: attach`; otherwise it is omitted.
 
+### Performance sheets (expression/pose references)
+
+For **acting-heavy or dialogue-heavy generations**, also attach the character's
+expression sheet (`char_NN_expressions`) — and for action choreography, the pose
+sheet (`char_NN_poses`) — as extra references. These are registered in the
+shared asset registry under `<cid>_expressions` / `<cid>_poses`, so name them in
+`ref_images:` like any other asset:
+
+```
+ref_images: char_01_expressions, char_02_expressions
+```
+
+This keeps facial acting and body language on-model where the generation depends
+on a specific expression or pose. Skip them on pure establishing/background
+sheets to stay within the reference budget.
+
 ## Cast-lock (mandatory — this is the anti-hallucination core)
 
 - **Character sheets and storyboard sheet prompts** must only reference

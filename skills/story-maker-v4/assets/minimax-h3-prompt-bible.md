@@ -11,7 +11,7 @@ transitions, facial acting, micro-beats, composition rules), see
 MiniMax H3 is an omni-modal R2V model: it accepts up to 9 reference images, 3 reference
 videos, 3 audio clips (12 files total), follows structured prompts,
 and generates video with **native 32 kHz stereo audio** (voice, SFX, music).
-Hard limit: **15 seconds per generation**. H3's Context-IR stage works best when
+Hard limit: **20 seconds per generation**. H3's Context-IR stage works best when
 every shot is an explicit audiovisual instruction, not a plot summary.
 
 ---

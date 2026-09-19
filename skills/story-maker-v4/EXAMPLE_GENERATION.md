@@ -1,6 +1,6 @@
 # Story Maker V4 — Canonical End-to-End Generation Example
 
-> **Purpose:** This document provides a complete, production-grade, end-to-end reference walkthrough of how a story moves through the Story Maker V4 architecture. It details every artifact generated at each stage, explicitly identifies the AI models employed, explains how our **15-second generation limitation** is engineered into cohesive multi-minute stories, and documents exact prompt structures for characters, locations, objects, storyboard sheets, and video generations.
+> **Purpose:** This document provides a complete, production-grade, end-to-end reference walkthrough of how a story moves through the Story Maker V4 architecture. It details every artifact generated at each stage, explicitly identifies the AI models employed, explains how our **20-second generation limitation** is engineered into cohesive multi-minute stories, and documents exact prompt structures for characters, locations, objects, storyboard sheets, and video generations.
 
 ---
 
@@ -25,7 +25,7 @@ Every generative step in Story Maker V4 targets a specific, calibrated model bac
 ## 2. Engineering Around the 15-Second Video Constraint
 
 ### The Challenge
-Diffusion-based video models with high temporal coherence, such as **Minimax Hailuo H3 R2V**, enforce a hard cap of **15 seconds** (or 375 frames at 25 fps) per generation pass. Attempting to render longer durations in a single pass leads to catastrophic memory consumption, hallucinated physics, and temporal drift.
+Diffusion-based video models with high temporal coherence, such as **Minimax Hailuo H3 R2V**, enforce a hard cap of **20 seconds** (or 500 frames at 25 fps) per generation pass. Attempting to render longer durations in a single pass leads to catastrophic memory consumption, hallucinated physics, and temporal drift.
 
 ### The Story Maker V4 Solution
 Story Maker V4 achieves continuous 1-minute, 3-minute, or 5-minute films through four coordinated architectural pillars:
@@ -53,8 +53,8 @@ Story Maker V4 achieves continuous 1-minute, 3-minute, or 5-minute films through
 ```
 
 1. **Scene-to-Generation Budgeting**:
-   - Every scene in `scenes.md` is partitioned into discrete generations of **5.0 to 15.0 seconds** (`g1`, `g2`, `g3`, etc.).
-   - Shorter transitional scenes (e.g. 8–12s) occupy a single generation. Longer dramatic sequences (e.g. 60s) split into 4 balanced 15s generations.
+   - Every scene in `scenes.md` is partitioned into discrete generations of **5.0 to 20.0 seconds** (`g1`, `g2`, `g3`, etc.).
+   - Shorter transitional scenes (e.g. 8–12s) occupy a single generation. Longer dramatic sequences (e.g. 60s) split into 3 balanced 20s generations.
    - **Hard Rule**: A cinematic shot never crosses a generation boundary. Cuts snap cleanly to generation edges.
 
 2. **Micro-Pacing & Visual Economy (3–6 Shots per Generation)**:
@@ -62,7 +62,7 @@ Story Maker V4 achieves continuous 1-minute, 3-minute, or 5-minute films through
    - This rhythm mirrors modern animation direction (Pixar, DreamWorks, anime), ensuring high dynamism without visual clutter.
 
 3. **Keyframe-to-Panel Staging**:
-   - Each 15s generation is anchored by **one storyboard sheet** featuring a **6-panel (`3x2`)** or **9-panel (`3x3`)** grid.
+   - Each generation is anchored by **one storyboard sheet** featuring a **6-panel (`3x2`)** or **9-panel (`3x3`)** grid.
    - The panels provide the frozen visual keyframes that guide Minimax H3's camera moves, actor poses, lighting shifts, and spatial blocking across the timeline.
 
 4. **Dynamic Tail Conditioning (`ref_videos`)**:
@@ -560,7 +560,7 @@ Generate a cinematic 15.0-second sequence (15.0s – 30.0s of Scene 1) continuin
 When preparing or validating any Story Maker V4 run, ensure:
 1. **Grid Selected Appropriately**:
    - `3x2` (6 panels, 8:3 ratio) for standard 8–12s generations (default).
-   - `3x3` (9 panels, 16:9 ratio) for dense, rapid-cut 13–15s action generations.
+   - `3x3` (9 panels, 16:9 ratio) for dense, rapid-cut 13–20s action generations.
 2. **Shot-to-Panel Ratio**: Every panel belongs to exactly one shot. No shot spans across generation boundaries.
 3. **Model Specifications Quoted**: All still prompts target **OpenAI GPT-Image-2** (3840×2160, WebP); video prompts target **Minimax Hailuo H3 R2V** (1056×608, 25fps, native stereo).
 4. **Tail Continuity Configured**: Every generation after `g1` declares `ref_videos: [previous_tail.mp4]`.

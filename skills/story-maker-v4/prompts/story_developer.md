@@ -5,6 +5,7 @@
 - `<run_dir>/developed_story.md` — production-grade **animation screenplay** (not prose summary).
 - `<run_dir>/story.json` — machine-readable canonical entity & constraint manifest.
 - `<run_dir>/beat_board.md` — the story's dramatic beats.
+- `<run_dir>/style_bible.md` — the per-episode art-direction lock (see below).
 
 ## Job
 
@@ -43,6 +44,24 @@ Extract and classify explicit story rules into `## Constraints` and `story.json`
 
 After the developed story is written, extract its **dramatic beats** into a beat
 board per [`prompts/beat_board.md`](beat_board.md). Agent 2 reads both to group beats into scenes.
+
+## Style Bible (art-direction lock)
+
+Author `<run_dir>/style_bible.md` per [`prompts/style_bible.md`](style_bible.md)
+alongside the screenplay. It is the episode's single visual-language source:
+production target, palette script (one entry per scene), shape language, line
+weight, background treatment, lighting rules, texture/grain, and a Do/Don't
+list. Agent 2's `style_target`/`visual_motif` per scene and every image prompt
+must agree with it. Validate with
+`python3 scripts/validate.py style_bible.md --schema style_bible --run-dir <run_dir>`.
+
+## Character signature expressions
+
+In `developed_story.md`'s `## Characters`, give each character an
+`**Expressions:**` line listing their 3–4 signature expressions (the defining
+looks the expression sheet leads with) and, where useful, a signature action
+pose. Agent 4's expression/pose performance sheets read these.
+
 
 ## Rules
 

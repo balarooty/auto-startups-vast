@@ -298,6 +298,52 @@ Never write abstract instructions like "the boy reacts with surprise." Professio
 
 ---
 
+## Section G-bis — The 12 Principles of Animation for AI Video
+
+Johnston & Thomas's 12 principles are the difference between motion that feels alive
+and motion that feels like a puppet. AI video models absorb some of them from training
+data, but they **reliably skip follow-through, slow in/out, and cadence** — so those
+must be written into the prompt explicitly. For each principle: what it is, how AI
+fails it, and the exact phrasing to use in `action:` / `camera:` / `motion_profile:`.
+
+| # | Principle | How the AI fails it | Prompt phrasing to force it |
+|---|-----------|---------------------|------------------------------|
+| 1 | **Squash & Stretch** | Impacts stay rigid; landings have no give | "the tin **squashes on impact, then springs back**"; "her cheeks **compress** on landing, braids **stretch** upward" |
+| 2 | **Anticipation** | Action starts instantly with no wind-up | name the wind-up: "**crouches low**, then leaps"; "**draws the arm back**, then throws" |
+| 3 | **Staging** | Focal point unclear; eye doesn't know where to look | one dominant read per shot; use Section H composition + `visual_hierarchy` |
+| 4 | **Pose-to-Pose vs Straight-Ahead** | Motion is mushy, no clear key poses | name the **key poses** in order: "start crouched → mid-air stretch → landed crouch" |
+| 5 | **Follow-Through & Overlapping Action** | Everything stops at once (the #1 stiffness tell) | "**hair swings past and settles**"; "cape **travels past the stop and sways back**" → `motion_profile: follow_through, overlapping` |
+| 6 | **Slow In / Slow Out** | Motion is linear, robotic, constant speed | give every move an easing: "**starts slow, accelerates, slams to a stop**"; "camera **eases in**, holds" → `motion_profile: ease_in_out` |
+| 7 | **Arcs** | Limbs and camera move in straight lines | describe curved paths: "arm **swings in a wide arc**"; "camera **arcs around** the pair" |
+| 8 | **Secondary Action** | Only the main action moves; scene feels dead | add a subordinate motion: "**ears twitch** while he listens"; "**fidgets with the strap** during the line" → `motion_profile: secondary_motion` |
+| 9 | **Timing (cadence)** | Full-motion everywhere — no cartoon "hold" feel | declare the frame cadence: `motion_profile: on_twos` for 2D anime/cartoon holds, `on_ones` for fluid action, `hold` for a held pose |
+| 10 | **Exaggeration** | Acting is realistic and underplayed (reads flat in cartoon) | push past realism: "eyes widen **impossibly large**"; "jaw **drops to the chest**" |
+| 11 | **Solid Drawing / Model** | Character volume/identity drifts shot-to-shot | lock via character sheets + `developed_story.md` appearance + spatial plan; keep poses volumetric ("weight on the back foot") |
+| 12 | **Appeal** | Characters are bland, no silhouette | strong readable silhouette per pose (see `layout_strategy`); one clear personality-driven movement style per character |
+
+### The `motion_profile:` field (per shot)
+
+Each storyboard shot may declare a `motion_profile:` — a comma list combining **one
+easing**, **one cadence**, and any **principle flags**:
+
+```
+motion_profile: ease_in_out, on_twos, follow_through, secondary_motion
+```
+
+- **Easing (pick ≤1):** `ease_in`, `ease_out`, `ease_in_out`, `linear`, `snap`.
+  "Slow in / slow out" made explicit. Default a camera or character move to
+  `ease_in_out`; use `snap` for whips, impacts, and jump-scare cuts of motion.
+- **Cadence (pick ≤1):** `on_ones` (full fluid motion — action/climax), `on_twos`
+  (12fps-equivalent held-pose feel — classic 2D anime/cartoon), `hold` (a held pose
+  with only secondary motion alive — tender/suspense beats).
+- **Principle flags (any):** `follow_through` (required on any impact/leap),
+  `overlapping` (body parts at different rates), `secondary_motion` (cloth/hair/props).
+
+**Rule of thumb:** an impact or leap verb in `action:` (jump, slam, land, throw, kick,
+crash, fall, burst) without `follow_through` in `motion_profile:` is a stiffness bug —
+the validator warns on it.
+
+
 ## Section H — Composition Rules (12 Essential Techniques)
 
 | Rule | Description | Narrative Purpose |
@@ -310,7 +356,7 @@ Never write abstract instructions like "the boy reacts with surprise." Professio
 | `depth` | Staging with distinct Foreground, Midground, and Background | Layered 3D parallax, rich world density, tactile immersion |
 | `silhouette` | Subject backlit in black profile against vibrant light | Graphic elegance, mystery, iconic hero posture |
 | `frame_within_frame` | Archways, doorframes, foliage branches framing subject | Voyeurism, feeling trapped, crossing a threshold |
-| `visual_hierarchy` | Lighting and contrast ensure one dominant focal point | Instant visual clarity in fast 5–15s animated sequences |
+| `visual_hierarchy` | Lighting and contrast ensure one dominant focal point | Instant visual clarity in fast 5–20s animated sequences |
 | `headroom` | Calculated vertical breathing room above character's head | Proper framing; too little feels cramped, too much feels dwarfed |
 | `look_room` | Negative space ahead of character's gaze direction | Visual balance allowing character to "look into their future/goal" |
 | `screen_direction` | Respecting the 180° axis across editorial cuts | Ensures spatial coherence so characters face each other correctly |
