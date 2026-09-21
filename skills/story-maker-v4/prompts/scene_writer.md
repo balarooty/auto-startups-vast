@@ -13,9 +13,9 @@ Read the **beat board** first. It lists the story's dramatic beats with emotiona
 register and rough timing. Group these beats into **N scenes**, where
 `N = ceil(target_seconds / 70)`. (scene_budget = 70s; e.g. 5min/300s → 5 scenes,
 140s → 2 scenes, 70s → 1 scene.) Each scene is later split by Agent 3 into Minimax
-H3 generations of at most 15 seconds each (a ~70s scene ≈ 5 generations, each with
+H3 generations of at most 15 seconds each (a ~75s scene ≈ 5 generations, each with
 its own storyboard sheet). Group beats so each scene is a self-contained unit of
-action in ONE location, and prefer beats that break naturally into <=20s stretches
+action in ONE location, and prefer beats that break naturally into <=15s stretches
 of continuous action.
 
 **Screenplay Authority:** `developed_story.md` is now a full animation screenplay
@@ -108,6 +108,11 @@ Author `<run_dir>/sound_map.md` per [`prompts/sound_map.md`](sound_map.md)
 alongside `scenes.md`. It defines the episode **music arc**, a **leitmotif per
 named character**, and per-scene ambience/motif/music/sting entries. Agent 5's
 `non_diegetic_music` and ambience layers reference these motif names so the
-score stays continuous across 20s generations instead of being reinvented per
+score stays continuous across 15s generations instead of being reinvented per
 render. Validate with
 `python3 scripts/validate.py sound_map.md --schema sound_map --run-dir <run_dir>`.
+## Dialogue voice lock
+
+When `voice_bible.md` exists (authored by Agent 1), keep every beat's dialogue
+consistent with it — speech pattern, vocabulary, and how characters address each
+other. Never soften a character's voice to textbook politeness.

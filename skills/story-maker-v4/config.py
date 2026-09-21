@@ -89,6 +89,10 @@ BACKGROUND_IMAGE_SIZE = os.getenv("BACKGROUND_IMAGE_SIZE", "3840x2160")
 # Phase 2: also generate per-character expression + pose performance sheets
 # (derived from the identity sheet). Disable to skip the extra image spend.
 BUILD_CHARACTER_VARIANT_SHEETS = os.getenv("BUILD_CHARACTER_VARIANT_SHEETS", "1").lower() not in ("0", "false", "off", "no")
+# P4: attach per-character voice-reference clips (<assets>/voices/<cid>.wav) as
+# H3 ref_audios so a character speaks in the same timbre every generation.
+# H3 reference audio is billed free. Disable to render without voice anchors.
+VOICE_REFS_ENABLED = os.getenv("VOICE_REFS_ENABLED", "1").lower() not in ("0", "false", "off", "no")
 # One storyboard sheet per Minimax generation: a clean landscape panel grid
 # (no text, no timecodes) attached verbatim as the Minimax reference image.
 # 3840x2160 (4K) — file size kept small via output_format=webp + output_compression.

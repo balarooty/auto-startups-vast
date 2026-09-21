@@ -1,7 +1,7 @@
 ---
 name: story-maker-v4
-version: 4.3.0
-description: "Production-ready story-to-video skill where Claude Code authors and validates artifacts while Python runs deterministic media tasks. Video backend: MiniMax H3 R2V via ComfyUI — each 5–20s generation uses a storyboard sheet, structured Ref2VA prompt, native stereo audio, and bounded optional references. No panel crops or upscales."
+version: 4.5.0
+description: "Production-ready story-to-video skill where Claude Code authors and validates artifacts while Python runs deterministic media tasks. Video backend: MiniMax H3 R2V via ComfyUI — each 5–15s generation (strictly 15.0s per standard generation) uses a storyboard sheet, structured Ref2VA prompt, native stereo audio, and bounded optional references. No panel crops or upscales."
 triggers:
   - story-maker-v4
   - story-maker v4
@@ -19,8 +19,8 @@ here — the model authoring every artifact is you.
 
 **V4 targets MiniMax H3 reference generation.** It preserves the V3 pipeline,
 adds a self-contained Ref2VA contract, H3 reference budgets, and an H3 pacing
-profile. H3 renders directly from a storyboard sheet; a generation is limited to
-**5–20 seconds**, so a shot that cannot finish inside the current generation
+profile. H3 renders directly from a storyboard sheet; a generation is strictly limited to
+**5–15 seconds (strictly 15.0s per standard generation)**, so a shot that cannot finish inside the current generation
 moves — panels and all — to the next generation's storyboard.
 
 ## Architecture (brain / hands split)
@@ -32,10 +32,10 @@ moves — panels and all — to the next generation's storyboard.
 | Minimax H3 video render + concat | **Python background batch** | `scripts/render_all.py` → sequential render: each generation is conditioned on the previous generation's rendered tail (3s) via `ref_videos`, then concat. Hours — fire-and-forget |
 
 Locked chunking: **1 scene = N generations; 1 generation = 1 storyboard sheet =
-1 Minimax H3 render, 5-20s**. Each sheet is a clean panel grid (`panel_grid`,
+1 Minimax H3 render, 5-15s (strictly 15.0s standard)**. Each sheet is a clean panel grid (`panel_grid`,
 6-12 panels, column-major numbering, NO text/timecodes on the image). Default
 grid is `3x2` (3 rows × 2 columns). A shot never straddles a
-generation boundary. A ~70s scene ≈ 5 generations. Continuity between adjacent
+generation boundary. A ~75s scene ≈ 5 generations. Continuity between adjacent
 generations is handled at render time by conditioning each generation on the
 previous generation's rendered tail (3s) as a `ref_video`. No bridge
 generations are used.
@@ -212,7 +212,24 @@ python3 scripts/validate.py "$RUN/beat_board.md" --schema beat_board --target-se
 ```
 
 Read `$RUN/beat_board.md.validation.json`. If `ok:false`, fix every listed error
-and re-run. **Do not proceed to Agent 2 until the beat board passes.**
+and re-run. **Do not proceed to Agent 1c until the beat board passes.**
+
+### A1c. Dialogue pass (Agent 1c)
+
+Read `developed_story.md`, `voice_bible.md`, and `beat_board.md`, then rewrite
+every dialogue line per [`prompts/dialogue_pass.md`](prompts/dialogue_pass.md):
+scene intent first, subtext over statement, voice-bible lock, economy at
+~2.5 words/sec, the cover-up-names test, and the anti-repetition gate. Update
+`developed_story.md` in place, then re-validate:
+
+```bash
+python3 scripts/validate.py "$RUN/developed_story.md" --schema screenplay
+python3 scripts/validate.py "$RUN/voice_bible.md" --schema voice_bible --run-dir "$RUN"
+```
+
+Both must pass. **Do not proceed to Agent 2 until the dialogue pass is done** —
+downstream agents carry dialogue verbatim, so voice problems are cheapest to fix
+here and impossible to fix after the render.
 
 ### A2. Break into scenes (Agent 2)
 
@@ -235,12 +252,12 @@ re-run. **Do not proceed until it passes.**
 
 Before authoring spatial geography or storyboard boundaries, analyze the scene's
 dramatic beats, physical choreography, and dialogue tempo to establish the
-**Dynamic Shot Depth & Duration Plan**:
+**Dynamic Shot Depth & Duration Plan** (modeled directly on `easter-for-mom/epi-1` where every generation strictly spans 15.0s):
 - **Story-First Pacing Rule (MANDATORY)**:
-  * **1-Shot Master Take / Oner (10.0s–20.0s)**: When the narrative beat is a continuous physical sequence (continuous slide down a cavern, sovereign entrance, unbroken falling action, high-stakes continuous tracking, or sustained emotional dialogue), **DO NOT CUT**. Author it as an unbroken single-shot Master Take (10.0–20.0s) filling the generation.
-  * **Asymmetric 2-Shot Dynamic (2 shots per generation)**: Unequal dramatic division based on action/reaction or statement/rebuttal (e.g. 11.5s setup + 3.5s reaction; 9.0s statement + 6.0s rebuttal; 5.0s confrontation + 10.0s lethal whisper and freeze).
-  * **Dynamic Action Arc (3 shots per generation)**: High-stakes physical sequences with varying tempo (e.g. 6.0s drift/approach + 2.5s shock impact + 6.5s smoke/standoff).
-  * **Rapid Montage (4+ shots per generation)**: Strictly reserved for high-tempo preparation, chaotic impacts, or rapid flashbacks.
+  * **1-Shot Master Take / Oner (15.0s Continuous)**: When the narrative beat is a continuous physical sequence (continuous slide down a cavern, sovereign entrance, unbroken falling action, high-stakes continuous tracking, or sustained emotional dialogue), **DO NOT CUT**. Author it as an unbroken single-shot Master Take (`0.0–15.0s`) filling the 15s generation (reference: `easter-for-mom/epi-1/video_prompts/s1_g1.txt` and `s4_g1.txt`).
+  * **Asymmetric 2-Shot Dynamic (2 shots summing to 15.0s)**: Unequal dramatic division based on action/reaction or statement/rebuttal. Supports any narrative-driven division (e.g. `9.5s + 5.5s` as in `s2_g1.txt`, `7.0s + 8.0s` as in `s4_g2.txt`, or extreme dynamics such as `1.5s + 13.5s`, `2.5s + 12.5s`, `3.5s + 11.5s`). Divide them organically based on the beat; avoid mechanical equal halves (e.g. 2 × 7.5s).
+  * **Dynamic Action Arc (3 shots summing to 15.0s)**: High-stakes physical sequences varying tempo across setup, action peak, and resolution/reaction (e.g. `5.5s + 4.5s + 5.0s` as in `s1_g2.txt`; `4.5s + 6.5s + 4.0s` as in `s1_g3.txt`; `4.5s + 5.0s + 5.5s` as in `s3_g2.txt`).
+  * **Rapid Montage (4–5 shots summing to 15.0s)**: Strictly reserved for high-tempo preparation, chaotic impacts, physical comedy, or rapid flashbacks (e.g. `s2_g3.txt`: `2.5s + 3.0s + 3.0s + 3.5s + 3.0s = 15.0s`).
   * **STRICT PROHIBITION**: Never mechanically split generations into identical shot counts (e.g. defaulting to 2 shots per generation or 4 shots per scene), never repeat a uniform shot count across generations (e.g. every generation using exactly 3 shots, even with varied durations), and never use arbitrary uniform slices (e.g. 2 × 7.5s or 4 × 3.75s). Mechanical slicing and uniform shot-count pacing will trigger validator warnings.
 - **Dynamic Cinematography Rule (MANDATORY)**:
   * Every shot must have an intentional camera angle (`low_angle`, `high_angle`, `worm_eye`, `bird_eye`, `side_profile`, `three_quarter`, `over_the_shoulder`, `dutch_angle`, `pov`, `reverse_shot`).
@@ -269,15 +286,15 @@ to legacy behaviour (warning, not error).
 For each scene `sN`, author `$RUN/storyboard_sN.md` per
 [`prompts/storyboard_planner.md`](prompts/storyboard_planner.md) and
 [`assets/directors-guide.md`](assets/directors-guide.md): the scene split
-into `## Generation gK — a-b s` blocks (each 5-20s, contiguous, summing to the
+into `## Generation gK — a-b s` blocks (each 5-15s, contiguous, strictly 15.0s per standard generation, summing to the
 scene's `target_seconds`), each with `panel_grid` and `### Shot` blocks
 (contiguous, panels in reading order, Minimax camera vocabulary, audio +
 dialogue, `shot_size` + `composition` fields, 8-value transition grammar).
-**The 20s rule is load-bearing: a shot that does not fit in the
+**The 15s rule is load-bearing: a shot that does not fit in the
 current generation moves whole to the next one.**
 
 Shot durations must reflect the **Dynamic Shot Depth Plan** established in A3-Pre:
-shots range dynamically from 1.5s shock cuts to full 20.0s master takes, varying
+shots range dynamically from 1.5s shock cuts to full 15.0s master takes, varying
 rhythm naturally (fast-slow-fast, building tension, or sustained emotional hold).
 Every shot must enforce **multi-character prop ergonomics** (individual bowls/props in separate screen zones; never shared-bowl eating), **dialogue progression** (anti-repetition; authority arrival pivot), and **10-second commercial button structuring** where applicable.
 Then:
@@ -297,6 +314,8 @@ into `$RUN/image_prompts/`:
 - `characters/<cid>.txt` for each `cid` in the scene's `cast` (skip if it exists —
   character sheets are shared across scenes),
 - `locations/<lid>.txt` for each distinct `location_id` (skip if it exists),
+- `objects/<oid>.txt` for each distinct object (skip if it exists).
+  *Note on Multi-Episode Projects*: Universal `characters/`, `locations/`, and `objects/` are consolidated at the story level in `<story>/assets/image_prompts/` (shared across `epi-1`, `epi-2`, etc.). Episode folders `$RUN/image_prompts/` strictly house episode-specific storyboard prompts (`s1/`, `s2/`, etc.). Single-episode runs continue to support `$RUN/image_prompts/` directly.
 - `<scene>/storyboard_sheet_<gen>.txt` — one per generation, per
   [`prompts/storyboard_sheet_template.md`](prompts/storyboard_sheet_template.md).
   The storyboard-sheet prompt is a hierarchical document:
@@ -434,7 +453,7 @@ proceed to Stage C until the user explicitly approves the animatic.
 
 ## Stage C — Vision + video prompts (Claude authors; validate + fix each)
 
-### C1. Author each generation's Ref2VA prompt (Agent 5)
+### C1. Author each generation's video prompt (Agent 5)
 
 For each scene `sN` and generation `gK`: **Read** the sheet
 (`$RUN/storyboard_sheet_sN_gK.webp`) to see what was actually drawn, plus
@@ -443,28 +462,45 @@ For each scene `sN` and generation `gK`: **Read** the sheet
 [`assets/minimax-h3-modes-guide.md`](assets/minimax-h3-modes-guide.md),
 [`assets/cinematography-bible.md`](assets/cinematography-bible.md), and
 [`assets/unbound-storytelling-guide.md`](assets/unbound-storytelling-guide.md).
-Author `$RUN/video_prompts/sN_gK.txt` per [`prompts/video_prompter.md`](prompts/video_prompter.md):
-a 6-section Ref2VA prompt (`subject_definitions` / `summary` /
-`retention_analysis` / `detailed_description` / `overall_soundscape` /
-`non_diegetic_music`), adhering to the "One Job" rule across reference assets,
-aiming for 350–500 words in `detailed_description` without tag stuffing,
-framing key acting/vocal beats in MCU/CU to preserve facial fidelity,
-applying 3D camera motion syntax (`[Motion Type] with [amplitude] at [speed]`),
-using `[Shot N] At MM:SS.mmm` timestamps in **generation-local seconds**,
-the 8-value transition grammar (see the bible's transition table — vary transitions;
-a cut must add new information), `<d>[English] ...</d>` dialogue with stable speaker IDs,
-identity/count locks as inline prose, standardized seamless continuation phrasing for g2+,
-and two separate audio sections. Then:
+When `timing_sheet_sN_gK.md` exists, compile its rows into the shot prose.
+
+Author `$RUN/video_prompts/sN_gK.txt` per [`prompts/video_prompter.md`](prompts/video_prompter.md)
+(Director's Brief, built on MiniMax's official three-part formula):
+
+- **Reference material description** — what `<Picture 1>`/`<Video 1>` each DO; the
+  reference image carries identity, so write only **short identity anchors**
+  (<=60 words/character), never full wardrobe paragraphs.
+- **Core creative concept** — one sentence framing the generation's beat.
+- **Visual process description** — per-shot, per-second action (what happens each
+  second), one camera motion path (decompose to primitives, never "orbit"),
+  `motion_profile:` translated into prose, and the **4-layer Audio block**
+  (diegetic_dialogue / foley_and_sfx / environmental_ambience / non_diegetic_music)
+  referencing `sound_map.md` motifs for score continuity.
+- Detailed **guardrails** (H3-endorsed prohibitions) specific to this generation.
+- Style declarations consistent with `style_bible.md` (the validator errors on
+  contradiction). No panel-number references (error). No `char_NN` ids (error).
+
+Then:
 
 ```bash
 python3 scripts/validate.py "$RUN/video_prompts/sN_gK.txt" \
   --schema video_prompt --run-dir "$RUN" --scene sN
 ```
 
-Fix until `ok:true` (it checks all six sections present and ordered, shot
-count + timestamps against the storyboard, label definitions, dialogue tags,
-warns on tag stuffing or shallow description, and rejects `char_NN` tokens).
-Use `--legacy` to validate pre-Ref2VA prompts from existing runs.
+Fix until `ok:true` (shot count + timestamps against the storyboard, dialogue tags,
+`char_NN` rejection, and the P1 quality checks: panel-reference ban, 4-layer audio,
+identity-anchor word budget, single camera motion, style consistency, per-second
+density, motion_profile translation). Use `--legacy` to validate pre-Ref2VA prompts
+from existing runs.
+
+### C-Lock. Agent 5b craft review + render manifest
+
+After every prompt passes structurally, run a craft review over all
+`video_prompts/*.txt` using **Section 10 (Video Prompt Quality)** of
+[`assets/directing-questions.md`](assets/directing-questions.md) — 16 questions on
+identity bloat, reference roles, 4-layer audio, style consistency, single motion
+path, per-second density, motion_profile translation, dialogue fit, and guardrail
+specificity. Fix what it flags and re-validate. Then build the locked manifest.
 
 **═══ GATE 2 ═══**
 
@@ -481,6 +517,15 @@ python3 scripts/render_all.py --output-dir "$RUN" --only-scenes sN
 # then the full film:
 python3 scripts/render_all.py --output-dir "$RUN"
 ```
+
+**Voice anchoring (optional, P4):** if `<story>/assets/voices/<cid>.wav` clips
+exist, `render_all.py` automatically attaches them as H3 `ref_audios` for
+characters who speak in a generation — locking each character's timbre across
+all generations (H3 reference audio is billed free). Build draft clips from the
+voice bible with `python3 scripts/build_voice_refs.py --run-dir "$RUN"`
+(local TTS — replace with recorded/cloned voices for production). Disable with
+`VOICE_REFS_ENABLED=0`. In the prompt, assign each `<Audio N>` the vocal-timbre
+job per the bible's "One Job" rule.
 
 Sequential single-pass render:
 - **Render**: renders all generations (`g1, g2, ...`) sequentially via the
@@ -523,7 +568,7 @@ Use `python3 -m tools.seam_report "$RUN"` to quantify seam jumps.
 1. **Never print credentials.** Do not echo `COMFYUI_AUTH`, `FAL_KEY`,
    `REPLICATE_API_TOKEN`, or slices of them. Probe ComfyUI reachability without
    printing the auth value.
-2. **20 seconds, period.** No generation may exceed 20s and no shot may straddle
+2. **15 seconds, period.** No generation may exceed 15s and no shot may straddle
    a generation boundary — the storyboard validator enforces both. When a scene's
    pacing fights the boundary, re-cut the shots, don't stretch the generation.
 3. **Storyboard sheets must be text-free.** The sheet goes to Minimax verbatim;

@@ -27,7 +27,7 @@ def main() -> int:
     p.add_argument("--schema", required=True, choices=(
         "screenplay", "beat_board", "scenes", "storyboard", "prompts", "video_prompt",
         "critique", "spatial_plan", "spatial_qa", "constraints", "manifest",
-        "style_bible", "sound_map", "timing_sheet",
+        "style_bible", "sound_map", "timing_sheet", "voice_bible",
     ))
     p.add_argument("--target-seconds", type=int, default=None)
     p.add_argument("--scenes-path", default=None, help="scenes.md (for storyboard cross-check)")

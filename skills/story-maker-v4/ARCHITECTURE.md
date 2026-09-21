@@ -53,7 +53,7 @@
 ```
 
 **Key constraints:**
-- Each Minimax H3 generation is at most **20 seconds** (load-bearing).
+- Each Minimax H3 generation is at most **15 seconds** (load-bearing).
 - Each generation uses **one clean storyboard sheet** (4K, no text) as the reference image.
 - Each generation produces **native stereo audio** (Minimax generates it).
 - No panel crops, no upscales, no outpaints — the sheet goes to Minimax verbatim.
@@ -286,6 +286,10 @@ g1 → g2 → g3 → ... → final_film.mp4
 outputs/story-maker-v4/<story>/
 ├── assets/                          ← STORY-LEVEL SHARED (never wiped)
 │   ├── asset_registry.json          ← shared registry: characters + locations + objects + sheets
+│   ├── image_prompts/               ← universal prompt files shared across episodes
+│   │   ├── characters/              (char_01.txt, char_02.txt, ...)
+│   │   ├── locations/               (loc_01.txt, loc_02.txt, ...)
+│   │   └── objects/                 (obj_01.txt, obj_02.txt, ...)
 │   ├── characters/
 │   │   ├── char_01.webp             (4K, generated once, reused across episodes)
 │   │   ├── char_01_expressions.webp (expression grid + viseme chart, performance sheet)
@@ -305,7 +309,10 @@ outputs/story-maker-v4/<story>/
 │   ├── sound_map.md                 ← score/leitmotif plan (Agent 2)
 │   ├── storyboard_s1.md
 │   ├── timing_sheet_s1_g1.md        ← X-sheet analogue (Agent 3, per generation)
-│   ├── image_prompts/
+│   ├── image_prompts/               ← episode-only prompts (storyboard sheets per scene/gen)
+│   │   ├── s1/                      (storyboard_sheet_g1.txt, ...)
+│   │   ├── s2/
+│   │   └── s3/
 │   ├── critique_report.md
 │   ├── storyboard_sheet_s1_g1.webp  (4K, per generation)
 │   ├── animatic_s1.mp4              ← pacing preview (GATE 1.5)
@@ -314,8 +321,8 @@ outputs/story-maker-v4/<story>/
 │   ├── clips/
 │   ├── scene_s1.mp4
 │   └── ...
-├── epi-2/                           ← EPISODE 2 reads existing registry
-│   └── ...                          (only NEW characters/locations/objects are generated)
+├── epi-2/                           ← EPISODE 2 reads existing registry & universal prompts
+│   └── ...                          (only NEW characters/locations/objects are added to assets/)
 └── ...
 ```
 
@@ -436,7 +443,7 @@ Every video generation in Story Maker V4 is conditioned on **exactly one multi-p
 | Grid | Rows | Cols | Total Panels | Cell Size (px) | Cell Aspect | Recommended Generation Use Case |
 |---|---|---|---|---|---|---|
 | **`3x2`** *(Default)* | 3 | 2 | 6 | 1920×720 | 8:3 | Standard 8–12s generations (3–5 shots). Balanced setup/resolution. |
-| **`3x3`** | 3 | 3 | 9 | 1280×720 | **16:9** (True) | Dense, fast-paced 12–20s action generations (5–8 rapid shots). True 16:9 framing. |
+| **`3x3`** | 3 | 3 | 9 | 1280×720 | **16:9** (True) | Dense, fast-paced 12–15s action generations (5–8 rapid shots). True 16:9 framing. |
 | **`2x3`** | 2 | 3 | 6 | 1280×1080 | ~4:3 | 6-panel horizontal-flow sequence; good for portrait/character-heavy framing. |
 | **`2x2`** | 2 | 2 | 4 | 1920×1080 | **16:9** (True) | Brief 5–7s simple transitions or establishing sequences (2–3 shots). |
 | **`4x3`** | 4 | 3 | 12 | 1280×540 | 64:27 | High-density montage (note: splitting into 2 generations is preferred). |
@@ -509,7 +516,7 @@ Time flows **column-major** across the grid:
 ### 9.1 The 15-Second Generation Constraint & Continuous Film Engineering
 
 #### The Model Constraint
-Modern diffusion video backends like **Minimax Hailuo H3 R2V** have a strict, hardware- and architectural-enforced maximum duration of **20.0 seconds** (or 500 frames at 25 fps) per inference pass. Beyond 20 seconds, attention mechanisms experience exponential drift, actor consistency degrades, and VRAM limits are exceeded.
+Modern diffusion video backends like **Minimax Hailuo H3 R2V** operate with highest fidelity and spatial temporal consistency up to a maximum duration of **15.0 seconds** per inference pass. Beyond 15 seconds, attention mechanisms experience drift, actor consistency degrades, and pacing slackens.
 
 #### How We Achieve Cohesive Multi-Minute Films
 To produce complete 1-minute, 3-minute, or 5-minute animated films, Story Maker V4 decomposes time hierarchically and recombines it through sequential tail conditioning:
@@ -517,14 +524,14 @@ To produce complete 1-minute, 3-minute, or 5-minute animated films, Story Maker 
 ```
 Full Film (e.g. 180s)
   └── Scene s1 (e.g. 45s)
-        ├── Generation g1 (0.0s – 20.0s)  ──▶ extracts 3.0s tail (g1_tail.mp4)
-        ├── Generation g2 (20.0s – 40.0s) ──▶ conditioned on ref_videos: [g1_tail.mp4] ──▶ extracts g2_tail.mp4
+        ├── Generation g1 (0.0s – 15.0s)  ──▶ extracts 3.0s tail (g1_tail.mp4)
+        ├── Generation g2 (15.0s – 30.0s) ──▶ conditioned on ref_videos: [g1_tail.mp4] ──▶ extracts g2_tail.mp4
         └── Generation g3 (30.0s – 45.0s) ──▶ conditioned on ref_videos: [g2_tail.mp4]
               └── ffmpeg concats g1 + g2 + g3 ──▶ scene_s1.mp4
 ```
 
 1. **Scene Partitioning (5–15s Budgeting):**
-   - Scenes in `scenes.md` are divided into generations of 5.0 to 20.0 seconds in `storyboard_sN.md`.
+   - Scenes in `scenes.md` are divided into generations of 5.0 to 15.0 seconds (strictly 15.0s per standard generation) in `storyboard_sN.md`.
    - Each generation (`gK`) is assigned a dedicated storyboard sheet (`storyboard_sheet_sN_gK.webp`) and video prompt (`sN_gK.txt`).
 2. **Sequential Tail-Conditioning (`ref_videos`):**
    - `g1` renders as the sequence establishing pass.
@@ -581,7 +588,7 @@ Full Film (e.g. 180s)
 | `beat_board` | `validate_beat_board()` | 3+ beats, sequential, fields present, emotion vocab, sum check |
 | `scenes` | `validate_scenes()` | Scene count, target sum, cast/location present, beat coverage |
 | `spatial_plan` | `validate_spatial_plan()` | Landmark/zone uniqueness, panorama bounds, zone overlap, per-gen blocks, location_reference policy, generation_geography, position-in-zone, monotonic Z, no-teleport, shot coverage, facing/zoom vocabulary |
-| `storyboard` | `validate_storyboard()` | Generation contiguity, 5-20s, shot contiguity, panels (6-12), transitions, shot_size, composition, new-information rule, no bridge generations |
+| `storyboard` | `validate_storyboard()` | Generation contiguity, 5-15s, shot contiguity, panels (6-12), transitions, shot_size, composition, new-information rule, no bridge generations |
 | `prompts` | `validate_prompts()` | Char/location/object prompt files exist, sheet prompts per generation |
 | `video_prompt` | `validate_video_prompt()` | 6 Ref2VA sections, shot timestamps match storyboard, no char_NN tokens, dialogue tags |
 | `critique` | `validate_critique_report()` | All question IDs present, no FAIL, summary counts match |
@@ -799,7 +806,7 @@ video_prompts/sN_gK.txt ──▶ validate --schema video_prompt
      │
      ├── Sequential: clips/sN/gK.mp4
      │   └── Minimax H3 R2V (sheet = ref image, video prompt = timeline)
-     │       (≤20s, native stereo audio, 1056×608 default)
+     │       (≤15s, native stereo audio, 1056×608 default)
      │       (gK+1 conditioned on gK's rendered tail via ref_videos)
      │
      ├── Extract: 3s tail of gK after render (ffmpeg)

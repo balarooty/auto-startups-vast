@@ -356,7 +356,7 @@ the validator warns on it.
 | `depth` | Staging with distinct Foreground, Midground, and Background | Layered 3D parallax, rich world density, tactile immersion |
 | `silhouette` | Subject backlit in black profile against vibrant light | Graphic elegance, mystery, iconic hero posture |
 | `frame_within_frame` | Archways, doorframes, foliage branches framing subject | Voyeurism, feeling trapped, crossing a threshold |
-| `visual_hierarchy` | Lighting and contrast ensure one dominant focal point | Instant visual clarity in fast 5–20s animated sequences |
+| `visual_hierarchy` | Lighting and contrast ensure one dominant focal point | Instant visual clarity in fast 5–15s animated sequences |
 | `headroom` | Calculated vertical breathing room above character's head | Proper framing; too little feels cramped, too much feels dwarfed |
 | `look_room` | Negative space ahead of character's gaze direction | Visual balance allowing character to "look into their future/goal" |
 | `screen_direction` | Respecting the 180° axis across editorial cuts | Ensures spatial coherence so characters face each other correctly |

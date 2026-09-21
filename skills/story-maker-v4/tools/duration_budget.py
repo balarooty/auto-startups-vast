@@ -5,7 +5,7 @@ generation/scene durations sum correctly against the target.
 
 Locked budget:
   - generation: one Minimax H3 render from one storyboard sheet reference.
-    Duration 5-20s (model hard limit is 20s per generation).
+    Duration 5-15s (strictly 15.0s per standard generation).
   - Shots NEVER straddle a generation boundary: a shot that does not fit in the
     remaining seconds of the current generation moves to the next one.
   - scene_total = sum of generation durations = scene target_seconds.
@@ -21,7 +21,7 @@ import math
 
 # Minimax H3 generation limits (seconds).
 GEN_MIN = 5.0
-GEN_MAX = 20.0
+GEN_MAX = 15.0
 MINIMAX_FPS = 24
 
 # Storyboard sheet grid limits (panels per generation sheet).
@@ -31,7 +31,7 @@ PANELS_MAX = 12
 # H3 is most reliable when a generation has a few deliberate editorial
 # beats, rather than a dense montage of sub-second cuts.
 H3_RECOMMENDED_MAX_SHOTS = 5
-H3_RECOMMENDED_MAX_SHOT_SECONDS = 20.0  # Dynamic depth: single shot master take / continuous oner can be up to 20.0s (GEN_MAX)
+H3_RECOMMENDED_MAX_SHOT_SECONDS = 15.0  # Dynamic depth: single shot master take / continuous oner can be up to 15.0s (GEN_MAX)
 
 SCENE_BUDGET_DEFAULT = 70   # seconds; scene_count = ceil(target / scene_budget)
 

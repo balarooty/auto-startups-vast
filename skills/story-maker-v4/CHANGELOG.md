@@ -6,6 +6,115 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [4.5.0] - 2026-09-19
+
+Dialogue production fix — plan: [`plans/story-maker-v4-dialogue-fix.md`](../../plans/story-maker-v4-dialogue-fix.md).
+Research basis: MiniMax H3 native-audio guidance (voice-reference clips, mumble
+fixes, dialogue-forward mix ranking) + animation dialogue craft from Pixar/Disney
+writers (scene intent, subtext, economy, the cover-up-names test).
+
+### Highlights
+- **P1 — dialogue lint (deterministic).** The `video_prompt` validator now errors
+  on empty/placeholder `<d>` tags (silence must be directed, not spoken as "…"),
+  bracketed vocalizations inside `<d>` (`[Gasp!]` would be spoken as the word
+  "gasp"), duplicate lines within a generation, and lines exceeding ~2.5 words/sec
+  for their shot. Warns on cross-cut line repetition (anti-repetition gate) and
+  missing dialogue-forward mix ranking.
+- **P2 — Voice Bible** (`voice_bible.md` + `--schema voice_bible`): per-character
+  H3 voice description, speech patterns, signature vocabulary, taboos, sample
+  lines, and relationship registers. Coverage against the scene cast is checked,
+  sample lines are linted, and near-identical speech patterns warn (the
+  cover-up-names test). Authored by Agent 1; Agents 2/3/5 must match it.
+- **P3 — dedicated dialogue pass (Agent 1c):** a rewrite-for-voice step between
+  the beat board and scenes (`prompts/dialogue_pass.md`): scene intent, subtext,
+  voice lock, economy, cover-up-names, anti-repetition; screenplay re-validated
+  after.
+- **P5 — dialogue-forward mix ranking** documented in the 4-layer audio block.
+- **P4 — voice timbre anchoring:** `render_all.py` attaches
+  `<story>/assets/voices/<cid>.wav` clips as H3 `ref_audios` for speaking
+  characters (billed free by H3); new `scripts/build_voice_refs.py` builds draft
+  clips from the voice bible via local TTS; `VOICE_REFS_ENABLED` flag.
+- **Golden example:** `assets/dialogue-golden-example.md` — real before/after
+  fixes for empty tags, spoken vocalizations, and duplicate lines.
+
+### Added
+- `lint_dialogue_tag()` + `validate_voice_bible()` in `tools/validators.py`;
+  `voice_bible` schema in `scripts/validate.py`.
+- `prompts/voice_bible.md`, `prompts/dialogue_pass.md`.
+- `_find_voice_refs()` in `scripts/render_all.py`; `scripts/build_voice_refs.py`;
+  `VOICE_REFS_ENABLED` in `config.py`.
+- `assets/dialogue-golden-example.md`.
+- Tests: `tests/test_dialogue_lint.py` (11), `tests/test_voice_bible.py` (7),
+  `tests/test_voice_refs.py` (4).
+
+### Changed
+- `prompts/video_prompter.md` — voice bible input, mix-ranking rule, golden
+  dialogue example reference.
+- `prompts/story_developer.md` — voice bible authoring.
+- `prompts/scene_writer.md`, `prompts/storyboard_planner.md` — dialogue voice lock.
+- `SKILL.md` — Stage A1c dialogue pass step; Stage D1 voice anchoring; version 4.5.0.
+- `assets/directing-questions.md` — Q10.17 (cover-up-names test).
+
+---
+
+## [4.4.0] - 2026-09-19
+
+Video-prompt quality upgrade — fixes the "prompts pass but produce mediocre video"
+gap. Plan: [`plans/story-maker-v4-video-prompt-quality.md`](../../plans/story-maker-v4-video-prompt-quality.md).
+Research basis: MiniMax's official H3 handbook (three-part formula; camera
+decomposition; detailed prohibitions) + a cross-model study of AI video prompt
+mistakes (don't re-describe references; one motion path; no generic quality words).
+
+### Highlights
+- **P1 — quality enforcement in the video_prompt validator.** The Director's Brief
+  path now enforces, not just advises: panel-number references and flat audio are
+  errors; identity anchors over 120 words are errors (warn >60); compound camera
+  moves, untranslated `motion_profile`, thin per-second density, and style_bible
+  contradictions are caught. Corpus sweep of 126 real prompts found ~500 P1 issues.
+- **P2 — template rewritten to MiniMax's official 3-part formula** in
+  `prompts/video_prompter.md` and `assets/minimax-h3-prompt-bible.md`: reference
+  material description + core creative concept + per-second visual process.
+  Identity-anchoring policy (the reference image carries identity), single camera
+  motion path, detailed guardrails, timing-sheet compilation, style_bible lock.
+  Fixed a stale "15.0 seconds" hardcode (generations are 5–20s).
+- **P3 — craft gate.** New Section 10 (Video Prompt Quality, 16 questions) in
+  `assets/directing-questions.md`, run as an Agent 5b review over
+  `video_prompts/*.txt` during Stage C-Lock, before the paid render manifest locks.
+- **P4 — golden example.** `assets/video-prompt-golden-example.md` rewrites a real
+  weak prompt (crunchools s1_g1) to the new standard; the rewrite passes the
+  updated validator with zero errors/warnings against the real storyboard.
+
+### Added
+- `tools/validators.py` — `_VIDEO_AUDIO_LAYERS`, `_PANEL_REF_RE`,
+  `_CAMERA_MOTION_KEYWORDS`, `_MOTION_PROFILE_PHRASES`, `_ANIMATION/PHOTOREAL_STYLE_WORDS`;
+  P1 checks in `validate_video_prompt_brief` (panel refs, 4-layer audio, identity
+  budget, camera motion path, style_bible consistency, per-second density,
+  motion_profile translation); `run_dir` plumbed through `validate_video_prompt`.
+- `assets/directing-questions.md` Section 10 (16 questions).
+- `assets/video-prompt-golden-example.md`.
+- `tests/test_video_prompt_quality.py` (10 tests).
+
+### Changed
+- `prompts/video_prompter.md` — 3-part formula, identity anchoring, camera rule,
+  per-second process, guardrails, style lock, motion_profile translation; golden
+  example referenced; stale 15.0s hardcode fixed.
+- `assets/minimax-h3-prompt-bible.md` — new §0 (official formula + hard-won rules);
+  template updated to identity anchors, guardrails, 4-layer audio.
+- `prompts/critique_agent.md` — question bank now 275+ across 10 sections.
+- `SKILL.md` — Stage C1 rewritten for the Director's Brief + C-Lock Agent 5b craft
+  review step; version 4.4.0.
+- `tests/test_phase2.py` — Director's Brief fixtures updated to the 4-layer audio
+  contract.
+
+### Breaking
+- The `video_prompt` validator now **errors** on flat (non-4-layer) audio blocks
+  and panel-number references. Prompts authored before 4.4.0 will fail
+  re-validation until updated — this is intentional (the 4-layer contract was
+  already documented in `prompts/video_prompter.md`). Existing approved renders
+  are unaffected; re-renders should re-author prompts to the new standard.
+
+---
+
 ## [4.3.0] - 2026-09-19
 
 Full animation/cartoon direction upgrade — Phases 1–3 of

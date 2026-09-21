@@ -3,7 +3,7 @@
 > Authored by Agent 2 (Scene Writer) alongside `scenes.md`. This is the
 > episode's **score & sound-continuity plan**. Agent 5's `non_diegetic_music`
 > and ambience layers reference these motif names so music stays continuous
-> across 20s generations (otherwise each generation invents its own music).
+> across 15s generations (otherwise each generation invents its own music).
 > Validate: `python3 scripts/validate.py sound_map.md --schema sound_map --run-dir <run_dir>`
 
 ## Music Arc

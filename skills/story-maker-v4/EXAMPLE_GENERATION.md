@@ -53,8 +53,8 @@ Story Maker V4 achieves continuous 1-minute, 3-minute, or 5-minute films through
 ```
 
 1. **Scene-to-Generation Budgeting**:
-   - Every scene in `scenes.md` is partitioned into discrete generations of **5.0 to 20.0 seconds** (`g1`, `g2`, `g3`, etc.).
-   - Shorter transitional scenes (e.g. 8–12s) occupy a single generation. Longer dramatic sequences (e.g. 60s) split into 3 balanced 20s generations.
+   - Every scene in `scenes.md` is partitioned into discrete generations of **5.0 to 15.0 seconds** (`g1`, `g2`, `g3`, etc., strictly 15.0s per standard generation).
+   - Shorter transitional scenes (e.g. 8–12s) occupy a single generation. Longer dramatic sequences (e.g. 60s) split into 4 balanced 15s generations.
    - **Hard Rule**: A cinematic shot never crosses a generation boundary. Cuts snap cleanly to generation edges.
 
 2. **Micro-Pacing & Visual Economy (3–6 Shots per Generation)**:
@@ -560,7 +560,7 @@ Generate a cinematic 15.0-second sequence (15.0s – 30.0s of Scene 1) continuin
 When preparing or validating any Story Maker V4 run, ensure:
 1. **Grid Selected Appropriately**:
    - `3x2` (6 panels, 8:3 ratio) for standard 8–12s generations (default).
-   - `3x3` (9 panels, 16:9 ratio) for dense, rapid-cut 13–20s action generations.
+   - `3x3` (9 panels, 16:9 ratio) for dense, rapid-cut 12–15s action generations.
 2. **Shot-to-Panel Ratio**: Every panel belongs to exactly one shot. No shot spans across generation boundaries.
 3. **Model Specifications Quoted**: All still prompts target **OpenAI GPT-Image-2** (3840×2160, WebP); video prompts target **Minimax Hailuo H3 R2V** (1056×608, 25fps, native stereo).
 4. **Tail Continuity Configured**: Every generation after `g1` declares `ref_videos: [previous_tail.mp4]`.

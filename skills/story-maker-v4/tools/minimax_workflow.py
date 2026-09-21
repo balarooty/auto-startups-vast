@@ -547,7 +547,7 @@ def render_generation(
     extra_reference_audio_paths: list[str] | None = None,
     max_wait: int = 7200,
 ) -> dict:
-    """Render one <=20s Minimax H3 generation from a storyboard sheet.
+    """Render one <=15s Minimax H3 generation from a storyboard sheet.
 
     Video/audio references are uploaded and wired into ref_videos/ref_audios
     dynamically, exactly like image references. When none are passed, the

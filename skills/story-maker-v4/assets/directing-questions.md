@@ -201,7 +201,7 @@ artifacts, producing `critique_report.md` with PASS/FAIL per question.
 - **Pass:** 5-8 shots for action/fast-paced generations; fewer for tender beats.
 - **Fail:** too few shots (slow) or too many (chaotic) for the intended pacing.
 
-### Q2.7 — Are tender/dialogue beats allowed longer shots (6-20s)?
+### Q2.7 — Are tender/dialogue beats allowed longer shots (6-15s)?
 - **Check:** storyboard_sN.md — emotional/dialogue shots aren't cut too fast.
 - **Pass:** tender beats have shots longer than 4s with camera breathing.
 - **Fail:** tender beats cut every 1.5s (undermines the emotion).
@@ -724,7 +724,7 @@ artifacts, producing `critique_report.md` with PASS/FAIL per question.
 - **Pass:** removing any cut would lose information.
 - **Fail:** cuts that don't add information (should be camera_move).
 
-### Q5.19 — Does the editing respect the 20s generation limit?
+### Q5.19 — Does the editing respect the 15s generation limit?
 - **Check:** storyboard_sN.md — no shot straddles a generation boundary.
 - **Pass:** shots that don't fit move to the next generation (structurally validated).
 - **Fail:** shots straddling boundaries (structurally errored).
@@ -1369,3 +1369,103 @@ artifacts, producing `critique_report.md` with PASS/FAIL per question.
 - **Pass:** acting moments are framed close enough to maintain facial feature fidelity.
 - **Fail:** critical emotional turning points remain in extreme wide shots with small, unresolvable faces.
 
+
+---
+
+## Section 10: Video Prompt Quality (16 questions)
+
+Run this section during Stage C-Lock as an **Agent 5b craft review of the actual
+`video_prompts/*.txt` files**, before `build_manifest.py --approve`. The deterministic
+validator enforces structure; these questions judge prompt *craft*.
+
+### Q10.1 — Is identity anchored briefly instead of re-described?
+- **Check:** video_prompts/*.txt — each character has a short identity anchor (<=60 words, 2–3 signature traits) rather than a full wardrobe paragraph.
+- **Pass:** "Maintain the exact appearance of Kemi: curly auburn hair, green pinafore, gap-toothed grin."
+- **Fail:** a ~100-word paragraph re-listing every garment and texture the sheet already shows.
+
+### Q10.2 — Does the prompt state what the references DO?
+- **Check:** the preamble explains the division of labour — `<Picture 1>` carries identity/composition, `<Video 1>` carries ending state/momentum — and directs only motion, camera, lighting, audio.
+- **Pass:** an explicit reference-responsibility statement before the Timeline.
+- **Fail:** references mentioned only as "the attached image" with no assigned role.
+
+### Q10.3 — Is there a one-sentence core creative concept?
+- **Check:** video_prompts/*.txt — a single sentence frames the generation's beat and emotional point before the Timeline.
+- **Pass:** "Core creative concept: two friends discover their creation crackles with living spice."
+- **Fail:** no framing sentence — the generation is a list of actions with no point.
+
+### Q10.4 — Are there any panel-number references?
+- **Check:** video_prompts/*.txt — no "matches Panel 1", "panel 3 of the sheet", or similar.
+- **Pass:** shot prose describes the scene cinematically.
+- **Fail:** any panel reference (validator error).
+
+### Q10.5 — Does every shot carry all four audio layers?
+- **Check:** each `Audio:` block has `diegetic_dialogue`, `foley_and_sfx`, `environmental_ambience`, `non_diegetic_music` (a layer may read None/Silence).
+- **Pass:** four labelled layers per shot, each with concrete content.
+- **Fail:** a flat one-line "Audio: some sounds" (validator error).
+
+### Q10.6 — Is the score continuous with the episode's sound map?
+- **Check:** `non_diegetic_music` references the `sound_map.md` leitmotifs and the scene's score function rather than inventing new music per generation.
+- **Pass:** "Kemi's plucky pizzicato motif, slow tempo, easing out."
+- **Fail:** unrelated instrumentation invented per generation with no motif continuity.
+
+### Q10.7 — Does the style agree with the episode's style bible?
+- **Check:** the three style declaration lines match `style_bible.md`'s `production_target` and palette.
+- **Pass:** a 2D anime episode's prompts declare line weight, cel shading, painted backgrounds.
+- **Fail:** photorealism declared inside an animation episode (validator error).
+
+### Q10.8 — Does one camera motion path govern each shot?
+- **Check:** each camera sentence commits to a single motion, or an explicitly decomposed primitive pair (`truck left + pan right`).
+- **Pass:** "The camera pushes in with small amplitude at slow speed."
+- **Fail:** "The camera pushes in while tilting up and panning right" (validator warning).
+
+
+### Q10.9 — Is motion_profile from the storyboard translated into prose?
+- **Check:** for each `motion_profile:` term in the storyboard shot, the prompt contains its phrasing (eases / settles / the pose holds / snaps / follows through).
+- **Pass:** `ease_in_out, on_twos, follow_through` → "eases into the reach, the pose holds, then the coat settles".
+- **Fail:** the term exists in the storyboard but nowhere in the prompt (validator warning).
+
+### Q10.10 — Does every shot longer than ~4s describe what happens each second?
+- **Check:** long shots state the opening state, 1–3 timed action beats, and the settle pose.
+- **Pass:** "At the first second he lifts the ribbon; by the third it stretches taut; then it snaps back."
+- **Fail:** a 6s shot described in one flat sentence (validator warning).
+
+### Q10.11 — Is the timing sheet compiled into the prompt when one exists?
+- **Check:** when `timing_sheet_<scene>_g<gen>.md` exists, its action/camera/sound rows appear as the shot's beat structure and its dialogue cues sit in the right shots.
+- **Pass:** prompt beats align with the sheet's 0.5s rows in order.
+- **Fail:** the sheet exists but the prompt ignores or contradicts its timing.
+
+### Q10.12 — Do dialogue lines fit their shot and stay on-camera?
+- **Check:** spoken words are within ~2.5 words/sec of the shot, the speaker's mouth is on-camera, and off-frame speech is marked as voiceover.
+- **Pass:** a 4s shot carries a <=10-word line framed in MCU.
+- **Fail:** a 15-word line crammed into 2s, or speech from an off-frame face with no VO marking.
+
+### Q10.13 — Are the guardrails specific to this generation?
+- **Check:** the prohibition block covers the real failure risks (cast count, style drift, text/logos, duplicate props) plus story constraints.
+- **Pass:** guardrails reference the episode's actual constraints ("no dogs before Scene 8").
+- **Fail:** a generic disclaimer copied identically into every prompt with no story relevance.
+
+### Q10.14 — Is the Timeline within the word band?
+- **Check:** the Timeline totals roughly 350–500 words (validator warns outside ~300–600).
+- **Pass:** dense, purposeful prose with no filler adjectives.
+- **Fail:** under-specified (<300 words) or bloated (>600) with decorative language.
+
+### Q10.15 — Is every shot's sound tied to visible action?
+- **Check:** audio events name the on-screen action they belong to (foley attributed to a specific movement), not vague ambience only.
+- **Pass:** "the cleaver's CRACK lands as the ribbons separate."
+- **Fail:** "some sounds of cooking" with no action binding.
+
+### Q10.16 — Would this prompt produce a visibly better clip than the previous run?
+- **Check:** compare against the prior/adjacent generation — did the author fix a concrete weakness (bloat, stacked camera, missing layers, flat pacing) rather than merely reword?
+- **Pass:** a specific, named improvement is present.
+- **Fail:** the prompt is a cosmetic reword of a previously weak pattern.
+
+
+### Q10.17 — Does the dialogue pass the cover-up-names test?
+- **Check:** video_prompts/*.txt against voice_bible.md — cover the speaker IDs
+  on every `<d>` line; can you still tell who is speaking from word choice,
+  rhythm, and vocabulary alone? Each character's voice must match their
+  voice_bible entry (speech pattern, signature vocabulary, registers).
+- **Pass:** any two characters' lines are distinguishable without names; each
+  line matches its voice_bible speech pattern.
+- **Fail:** interchangeable voices — every character speaks in the same polite,
+  complete sentences (textbook AI prose).

@@ -6,6 +6,7 @@
 - `<run_dir>/story.json` — machine-readable canonical entity & constraint manifest.
 - `<run_dir>/beat_board.md` — the story's dramatic beats.
 - `<run_dir>/style_bible.md` — the per-episode art-direction lock (see below).
+- `<run_dir>/voice_bible.md` — the per-character dialogue voice lock (see below).
 
 ## Job
 
@@ -61,6 +62,18 @@ In `developed_story.md`'s `## Characters`, give each character an
 `**Expressions:**` line listing their 3–4 signature expressions (the defining
 looks the expression sheet leads with) and, where useful, a signature action
 pose. Agent 4's expression/pose performance sheets read these.
+
+## Voice Bible (dialogue voice lock)
+
+Author `<run_dir>/voice_bible.md` per [`prompts/voice_bible.md`](voice_bible.md)
+alongside the screenplay. One entry per character: H3 voice description (pitch,
+timbre, pace, accent), speech-pattern rules, signature vocabulary, taboo phrases,
+2–3 sample lines, and relationship registers. The gold standard is the
+**cover-up-names test** — hide the character's name on any line and it should
+still be obvious who is speaking. Agents 2, 3, and 5 must match it for every line.
+Validate with
+`python3 scripts/validate.py voice_bible.md --schema voice_bible --run-dir <run_dir>`.
+
 
 
 ## Rules

@@ -6,7 +6,7 @@ episode's final state when this is episode 2+). Never author a storyboard
 without that context loaded — Minimax prompts say things like "Continue
 directly from the previous scene", so you must know exactly what that was.
 **Output:** `<run_dir>/storyboard_<scene>.md` for each scene — the scene split
-into **generations** (one Minimax H3 render each, max 20s) and **shots**.
+into **generations** (one Minimax H3 render each, strictly max 15s) and **shots**.
 Then run
 `python3 scripts/validate.py storyboard_<scene>.md --schema storyboard --scenes-path <run_dir>/scenes.md`
 and fix until it passes.
@@ -28,12 +28,12 @@ this automatically.
 Split one scene's timeline into **generations**: each generation is ONE
 Minimax H3 render, driven by ONE storyboard sheet (clean panel grid) plus a
 timeline prompt. Inside a generation you plan **shots** (continuous camera
-takes separated by hard cuts). Minimax renders at most **20 seconds** per
+takes separated by hard cuts). Minimax renders at most **15 seconds** per
 generation — that is the load-bearing constraint of this whole plan.
 
 ## The 15-second rule (load-bearing)
 
-- A generation's duration is **5.0–20.0s**. Never more.
+- A generation's duration is **5.0–15.0s (strictly 15.0s per standard generation)**. Never more.
 - **A shot must NEVER straddle a generation boundary.** If the next shot does
   not fit in the remaining seconds of the current generation, close this
   generation early (>= 5s) and move the whole shot to the next generation.
@@ -214,15 +214,22 @@ Animation principles to apply:
 - **Secondary motion**: cloth, hair, ears, tail follow the primary action with delay
 
 - **Scene, Generation & Panel Grid Relationship**:
-  * A standard 30-second scene is executed through **two video generations (e.g. 15s + 15s)** (`g1` and `g2`),
+  * A standard 30-second scene is executed through **two 15s video generations** (`g1` and `g2`),
     anchored by a 6-panel storyboard sheet (`storyboard_sheet.txt`, grid `3x2` or `2x3`).
-  * Panels 1, 2, 3 (left column) anchor `g1`; Panels 4, 5, 6 (right column) anchor `g2`.
-  * **Inside each generation, shot count and durations are dictated solely by narrative necessity**:
-    - **1-Shot Master Oner (10.0s–20.0s)**: Claims all panels allocated to that generation (e.g. `panels: [1, 2, 3]`
-      for g1, or `[4, 5, 6]` for g2, or `[1, 2, 3, 4, 5, 6]` in a single-generation scene). The panels depict the
-      shot's progressive milestones: opening staging, mid-take action peak, and concluding settling pose.
-    - **Asymmetric 2-Shot**: Claims panels proportionally (e.g. Shot 1 gets `panels: [1, 2]`, Shot 2 gets `panels: [3]`).
-    - **Dynamic 3-Shot Arc**: Each shot claims its dedicated panel (`panels: [1]`, `panels: [2]`, `panels: [3]`).
+  * Panels 1, 2, 3 (left column) anchor `g1` (0.0–15.0s); Panels 4, 5, 6 (right column) anchor `g2` (15.0–30.0s).
+  * **Inside each 15-second generation, shot count and durations are dictated solely by narrative necessity** (modeled on `easter-for-mom/epi-1` where every generation strictly totals 15.0s):
+    - **1-Shot Master Oner (15.0s Continuous)**: Claims all panels allocated to that generation (e.g. `panels: [1, 2, 3]` for g1, or `[4, 5, 6]` for g2, or `[1, 2, 3, 4, 5, 6]` in a single-generation scene). The panels depict the shot's progressive milestones: opening staging, mid-take action peak, and concluding settling pose.
+      * *Reference*: `easter-for-mom/epi-1/video_prompts/s1_g1.txt` (`SHOT 1 — 0.0–15.0s Continuous Shot`).
+    - **Asymmetric 2-Shot Dynamic (2 shots summing to 15.0s)**: Claims panels proportionally (e.g. Shot 1 gets `panels: [1, 2]`, Shot 2 gets `panels: [3]`). Divide them organically based on the dramatic beat:
+      * *Reference*: `easter-for-mom/epi-1/video_prompts/s2_g1.txt`: Shot 1 (`0.0–9.5s`, 9.5s setup/master) + Shot 2 (`9.5–15.0s`, 5.5s reaction cut).
+      * *Reference*: `easter-for-mom/epi-1/video_prompts/s4_g2.txt`: Shot 1 (`0.0–7.0s`, 7.0s action approach) + Shot 2 (`7.0–15.0s`, 8.0s discovery hold).
+      * *Extreme Asymmetry*: Valid whenever motivated (e.g. `1.5s + 13.5s` for shock impact + aftermath; `2.5s + 12.5s` or `3.5s + 11.5s` for buildup + button). Avoid uniform 50/50 splits (e.g. 2 × 7.5s).
+    - **Dynamic 3-Shot Arc (3 shots summing to 15.0s)**: Each shot claims its dedicated panel (`panels: [1]`, `panels: [2]`, `panels: [3]`).
+      * *Reference*: `easter-for-mom/epi-1/video_prompts/s1_g2.txt`: Shot 1 (`0.0–5.5s`) + Shot 2 (`5.5–10.0s`) + Shot 3 (`10.0–15.0s`).
+      * *Reference*: `easter-for-mom/epi-1/video_prompts/s1_g3.txt`: Shot 1 (`0.0–4.5s`) + Shot 2 (`4.5–11.0s`) + Shot 3 (`11.0–15.0s`).
+      * *Reference*: `easter-for-mom/epi-1/video_prompts/s3_g2.txt`: Shot 1 (`0.0–4.5s`) + Shot 2 (`4.5–9.5s`) + Shot 3 (`9.5–15.0s`).
+    - **Rapid Montage / High-Tempo (4–5 shots summing to 15.0s)**:
+      * *Reference*: `easter-for-mom/epi-1/video_prompts/s2_g3.txt`: Shot 1 (`0.0–2.5s`) + Shot 2 (`2.5–5.5s`) + Shot 3 (`5.5–8.5s`) + Shot 4 (`8.5–12.0s`) + Shot 5 (`12.0–15.0s`).
   * **Strictly forbid defaulting to mechanical 2 shots per generation or 4 shots per scene — and equally forbid a uniform shot count across generations** (e.g. every generation using exactly 3 shots, even with varied durations, is static mechanical pacing). Adjacent generations should differ in shot count unless the dramatic beats genuinely repeat the same rhythm; the validator warns on uniform shot-count patterns.
 - **Dynamic Cinematography Rule (MANDATORY)**:
   * Every shot must have an intentional camera angle from the taxonomy:
@@ -422,10 +429,16 @@ transition: hard_cut
 
 After the storyboard passes, author one
 `timing_sheet_<scene>_g<gen>.md` per generation per
-[`prompts/timing_sheet.md`](timing_sheet.md): the generation's 5–20s mapped to
+[`prompts/timing_sheet.md`](timing_sheet.md): the generation's 5–15s mapped to
 0.5s rows of dialogue-phoneme / action / camera / sound keys (the X-sheet
 analogue). Agent 5 compiles it into the video prompt. Validate each with
 `python3 scripts/validate.py timing_sheet_<scene>_g<gen>.md --schema timing_sheet --run-dir <run_dir>`.
 - **Handoff block:** `on_screen`, `mood`, `transition` (`hard_cut` |
   `match_cut`). For the LAST scene, still emit the block pointing at a
   sentinel (`-> scene end`).
+
+## Dialogue voice lock
+
+When `voice_bible.md` exists, carry dialogue verbatim from the screenplay —
+never rewrite a line here in a different character voice. Keep delivery
+parentheticals from the voice bible's speech pattern.

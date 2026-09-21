@@ -26,6 +26,36 @@ Both formats are auto-detected by `validators.py`.
 
 ---
 
+## 0. The Official Three-Part Formula (MiniMax H3 handbook)
+
+MiniMax's own H3 handbook reduces prompt writing to one formula — none of the
+three parts may be skipped:
+
+1. **Reference material description** — WHAT each attached asset DOES. `<Picture 1>`
+   (storyboard sheet) defines viewpoint, placement, and panel sequence; `<Video 1>`
+   (previous tail) carries ending pose, camera path, and momentum. Do **not**
+   re-describe identity or wardrobe the reference already shows.
+2. **Core creative concept** — one sentence framing the whole generation: the beat
+   and its emotional point.
+3. **Visual process description** — what happens **every second**: opening state,
+   action beats, settle pose.
+
+Hard-won rules from the same handbook:
+
+- **Decompose camera moves into primitives.** Write `truck left + pan right` — never
+  the word "orbit". One motion path per shot.
+- **Prohibitions are load-bearing.** Official exemplars spend a large share of the
+  prompt on explicit don't-wants (no new characters appearing, no style drift, no
+  text/logos, no duplicated props). Write them in detail.
+- **Bind audio events to concrete on-screen actions** (e.g. "the snare lands as both
+  shoulders drop"), never a vague "sync to the beat".
+- **Suppress music explicitly**: close with `non_diegetic_music: N/A` (Director's
+  Brief: `non_diegetic_music: Silence`) when no score is wanted.
+- H3 accepts long prompts (up to ~7,000 characters) — but every character must do
+  work. Length is not control.
+
+---
+
 ## 1. Director's Brief Format (Default)
 
 ### Template Structure
@@ -36,13 +66,15 @@ subject_definitions:Reference
 Use the provided storyboard as the exact visual guide for composition,
 framing, character appearance, environment, and sequence progression.
 
-Maintain the exact appearance of [Character 1]: [Full descriptive paragraph of face, hair, clothing, palette, and key textures].
+Maintain the exact appearance of [Character 1]: [<=60-word identity anchor — 2-3 signature traits only; the reference image carries the rest].
 
-Maintain the exact appearance of [Character 2]: [Full descriptive paragraph].
+Maintain the exact appearance of [Character 2]: [<=60-word anchor].
 
 [Environment context — spatial layout, lighting, atmospheric quality, time of day].
 
-[Behavioral constraints & anti-artifact guardrails — e.g., "The characters are completely harmless and playful. Never generate duplicate characters, extra limbs, or distorted anatomy."]
+[DETAILED guardrails — H3-endorsed prohibitions: no new characters entering, fixed character count, no style drift mid-shot, hands remain natural, no on-screen text/logos/watermarks, hero props not duplicated. Add story-specific don'ts.]
+
+Core creative concept: [one sentence framing the generation's beat and its point.]
 
 Generate a cinematic [duration]-second [pacing] sequence matching the [grid]-panel storyboard.
 
@@ -61,9 +93,13 @@ SHOT 1 — 0.0–X.Xs (Continuous Shot)
 
 [Shot visual description: Shot size, camera angle, camera position, staging, and micro-beat acting sequence.]
 
-[Camera instruction: 3D Camera Formula: [Motion Type] with [amplitude] at [speed].]
+[Camera instruction: 3D Camera Formula: [Motion Type] with [amplitude] at [speed]. ONE motion path only; decompose to primitives if two are required.]
 
-Audio: [Foley, room tone, footsteps, material rustle, impact, and inline dialogue.]
+Audio:
+- diegetic_dialogue: [Speaker + delivery + <d>[Lang] line</d>, or None]
+- foley_and_sfx: [footsteps, cloth, impacts, prop handling]
+- environmental_ambience: [room tone / exterior bed]
+- non_diegetic_music: [instrumentation + tempo + dynamics, or Silence]
 
 [Transition phrase: e.g., "Hard cinematic cut." or "Cut on the action."]
 
@@ -72,9 +108,11 @@ SHOT 2 — X.X–Y.Ys (Continuous Shot)
 ```
 
 ### Optimal Depth & Description Sweet Spot
-- **Word Count**: Aim for **350–500 English words** across the combined `SHOT` blocks in the `Timeline`.
+- **Word Count**: Aim for **350–500 English words** across the combined `SHOT` blocks in the `Timeline` (the validator warns outside ~300–600).
+- **Identity anchors**: <=60 words per character in the preamble (validator errors above 120). The reference image carries identity; the prompt directs motion, camera, and audio.
 - **No Tag Stuffing**: Do not include keywords like `"4k"`, `"8k"`, `"masterpiece"`, `"photorealistic"`. H3 was trained on rich descriptive natural language.
 - **No Studio Brand Names**: Describe the craft, medium, texture, and lighting instead of using commercial brand names.
+- **No Panel References**: Never write "matches Panel 1" / "panel 3 of the sheet" — describe the cinematic scene directly (validator error).
 
 ---
 

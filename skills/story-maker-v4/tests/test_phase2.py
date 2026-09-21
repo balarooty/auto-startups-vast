@@ -26,10 +26,10 @@ def test_scene_count_for_target():
 
 
 def test_generation_count_for_scene():
-    assert db.generation_count_for_scene(70) == 4   # ceil(70/20)
+    assert db.generation_count_for_scene(70) == 5   # ceil(70/15)
     assert db.generation_count_for_scene(15) == 1
-    assert db.generation_count_for_scene(16) == 1
-    assert db.generation_count_for_scene(21) == 2
+    assert db.generation_count_for_scene(16) == 2
+    assert db.generation_count_for_scene(30) == 2
     assert db.generation_count_for_scene(0) == 0
 
 
@@ -199,16 +199,16 @@ def test_validate_storyboard_pass():
     assert res.ok, res.errors
 
 
-def test_validate_storyboard_catches_over_20s_generation():
-    bad = STORYBOARD_MD.replace("## Generation g1 — 0.0-15.0s", "## Generation g1 — 0.0-21.0s") \
-                       .replace("duration_seconds: 15.0", "duration_seconds: 21.0") \
-                       .replace("### Shot 2 — 7.2-15.0s (hard_cut)", "### Shot 2 — 7.2-21.0s (hard_cut)") \
-                       .replace("## Generation g2 — 15.0-27.0s", "## Generation g2 — 21.0-27.0s") \
-                       .replace("### Shot 1 — 15.0-27.0s (continuous)", "### Shot 1 — 21.0-27.0s (continuous)") \
-                       .replace("duration_seconds: 12.0", "duration_seconds: 6.0")
+def test_validate_storyboard_catches_over_15s_generation():
+    bad = STORYBOARD_MD.replace("## Generation g1 — 0.0-15.0s", "## Generation g1 — 0.0-16.0s") \
+                       .replace("duration_seconds: 15.0", "duration_seconds: 16.0") \
+                       .replace("### Shot 2 — 7.2-15.0s (hard_cut)", "### Shot 2 — 7.2-16.0s (hard_cut)") \
+                       .replace("## Generation g2 — 15.0-27.0s", "## Generation g2 — 16.0-27.0s") \
+                       .replace("### Shot 1 — 15.0-27.0s (continuous)", "### Shot 1 — 16.0-27.0s (continuous)") \
+                       .replace("duration_seconds: 12.0", "duration_seconds: 11.0")
     res = validators.validate_storyboard(bad)
     assert not res.ok
-    assert any("20s per generation" in e or "outside [5,20]" in e for e in res.errors)
+    assert any("15s per generation" in e or "outside [5,15]" in e for e in res.errors)
 
 
 def test_validate_storyboard_catches_shot_straddling_boundary():
@@ -867,9 +867,14 @@ DIRECTORS_BRIEF_PROMPT = textwrap.dedent("""
     SHOT 1 — 0.0–7.2s (Continuous Shot)
 
     A three-quarter front medium shot shows the toddler running forward along the corridor.
+    At the first second the toddler breaks into a run; by the third second the giggles start and the pace quickens.
     The toddler giggles with wide sparkling eyes and raised brows, little feet padding against the stones.
     The camera tracks backward with large amplitude at fast speed ahead of the toddler.
-    Audio: Soft patter of toddler socks on stone tiles, gentle breeze through window.
+    Audio:
+    - diegetic_dialogue: None
+    - foley_and_sfx: Soft patter of toddler socks on stone tiles, cloth rustle on each stride.
+    - environmental_ambience: Light breeze hushing through the high arched windows.
+    - non_diegetic_music: Gentle pizzicato strings, slow tempo, rising slightly.
     Cut on the action.
 
     SHOT 2 — 7.2–15.0s (Continuous Shot)
@@ -877,7 +882,11 @@ DIRECTORS_BRIEF_PROMPT = textwrap.dedent("""
     A low-angle medium closeup captures the tiny green dinosaur leaping gently into the toddler's lap.
     The toddler's eyes widen with sparkling delight, brows lift into soft arches, and mouth parts into a joyful smile.
     The camera pushes in with small amplitude at slow speed toward their faces.
-    Audio: Happy dinosaur chirp, toddler giggling, fabric rustling as they tumble together softly.
+    Audio:
+    - diegetic_dialogue: None
+    - foley_and_sfx: Happy dinosaur chirp, fabric rustling as they tumble together softly.
+    - environmental_ambience: Quiet corridor room tone with a faint breeze.
+    - non_diegetic_music: Pizzicato strings easing out and settling as the pair embrace.
 """).strip()
 
 
@@ -901,7 +910,7 @@ def test_directors_brief_catches_brand_name():
 
 
 def test_directors_brief_catches_missing_audio():
-    bad = DIRECTORS_BRIEF_PROMPT.replace("Audio: Soft patter", "Sound: Soft patter")
+    bad = DIRECTORS_BRIEF_PROMPT.replace("Audio:", "Sound:", 1)
     res = validators.validate_video_prompt(bad, _sb(), "g1")
     assert not res.ok
     assert any("Audio" in e for e in res.errors)
@@ -935,8 +944,13 @@ def test_directors_brief_g2_requires_continuation():
         SHOT 1 — 0.0–12.0s (Continuous Shot)
 
         A medium shot of the toddler petting the dinosaur.
+        The toddler reaches out and rests a hand on the dinosaur's snout, then settles.
         The camera is static with small amplitude at slow speed.
-        Audio: Gentle purring from the dinosaur.
+        Audio:
+        - diegetic_dialogue: None
+        - foley_and_sfx: Gentle purring from the dinosaur, soft cloth rustle.
+        - environmental_ambience: Quiet corridor room tone.
+        - non_diegetic_music: Pizzicato strings settling to a still resolution.
     """).strip()
     res = validators.validate_video_prompt(g2_prompt, _sb(), "g2")
     assert not res.ok
@@ -1620,6 +1634,39 @@ def test_object_prompt_path():
     from tools import image_pipeline as ip
     path = ip.object_prompt_path("/run", "obj_01")
     assert path.endswith("objects/obj_01.txt")
+
+
+def test_resolve_asset_prompt_path_story_level_assets(tmp_path):
+    """Test resolution order: local override -> story assets/image_prompts -> story image_prompts -> fallback."""
+    from tools import image_pipeline as ip
+
+    story_dir = tmp_path / "story"
+    episode_dir = story_dir / "epi-1"
+    story_assets_dir = story_dir / "assets" / "image_prompts" / "characters"
+    story_legacy_dir = story_dir / "image_prompts" / "locations"
+    local_prompts_dir = episode_dir / "image_prompts" / "characters"
+
+    story_assets_dir.mkdir(parents=True)
+    story_legacy_dir.mkdir(parents=True)
+    local_prompts_dir.mkdir(parents=True)
+
+    # 1. Local override takes precedence
+    (local_prompts_dir / "char_01.txt").write_text("local", encoding="utf-8")
+    (story_assets_dir / "char_01.txt").write_text("story_assets", encoding="utf-8")
+    assert ip.character_prompt_path(str(episode_dir), "char_01") == str(local_prompts_dir / "char_01.txt")
+
+    # 2. Universal asset resolved when no local exists
+    (story_assets_dir / "char_02.txt").write_text("story_assets_02", encoding="utf-8")
+    assert ip.character_prompt_path(str(episode_dir), "char_02") == str(story_assets_dir / "char_02.txt")
+
+    # 3. Legacy story-level image_prompts fallback
+    (story_legacy_dir / "loc_01.txt").write_text("story_legacy_loc", encoding="utf-8")
+    assert ip.location_prompt_path(str(episode_dir), "loc_01") == str(story_legacy_dir / "loc_01.txt")
+
+    # 4. Fallback to default local path when file doesn't exist anywhere
+    missing = ip.object_prompt_path(str(episode_dir), "obj_99")
+    assert missing == str(episode_dir / "image_prompts" / "objects" / "obj_99.txt")
+
 
 
 # --- beat board parsing + validation -----------------------------------------

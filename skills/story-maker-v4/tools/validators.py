@@ -11,7 +11,7 @@ No LLM calls. Pure parsing + assertions.
 Schemas enforced:
   scenes        -> scene_count>=1; each scene has scene_id/target_seconds/cast/location_id;
                    sum(targets) ~= run target.
-  storyboard    -> scene split into generations (each 5-20s, contiguous, sum ==
+  storyboard    -> scene split into generations (each 5-15s, contiguous, sum ==
                    target_seconds); shots contiguous within each generation and
                    NEVER straddling a generation boundary; panels sequential
                    (column-major: top-to-bottom within each column, then
@@ -112,7 +112,196 @@ FOCUS_TYPES = (
     "soft_focus",
 )
 
-# Animation motion-profile vocabulary (see assets/cinematography-bible.md Section G).
+# --- P1 video-prompt quality constants -------------------------------------
+
+# Required audio layers inside every shot's Audio: block (4-layer hierarchy).
+_VIDEO_AUDIO_LAYERS = (
+    "diegetic_dialogue",
+    "foley_and_sfx",
+    "environmental_ambience",
+    "non_diegetic_music",
+)
+
+# Banned storyboard-panel references in shot prose (describe the scene instead).
+_PANEL_REF_RE = re.compile(r"\bpanels?\s*\d+", re.IGNORECASE)
+
+# Camera-motion keyword roots — inflected forms ("pushes in", "tilts up") must
+# match, so we count distinct motion *ideas* rather than literal phrase substrings.
+_CAMERA_MOTION_KEYWORDS = (
+    "zoom", "push", "pull", "pan", "truck", "tilt", "pedestal", "arc",
+    "track", "static", "shake", "roll", "dolly", "crane", "whip", "orbit",
+    "handheld", "swish",
+)
+
+# Static + handheld-breathing are a common, legitimate combination — not a conflict.
+_CAMERA_BENIGN_PAIRS = (frozenset({"static", "handheld"}),)
+
+# motion_profile term -> phrase fragments the prompt text should contain.
+_MOTION_PROFILE_PHRASES = {
+    "ease_in": ("eases in", "slow start", "starts slow", "accelerates"),
+    "ease_out": ("eases out", "settles", "decelerates", "slows to a stop", "slows"),
+    "ease_in_out": ("eases", "smooth acceleration", "acceleration and deceleration"),
+    "linear": ("constant speed", "steady pace", "even tempo"),
+    "snap": ("snaps", "snap", "whips", "instant", "abrupt"),
+    "on_ones": ("fluid", "smooth continuous"),
+    "on_twos": ("held pose", "held", "stepped", "staccato", "pose holds", "holds the pose"),
+    "hold": ("holds", "held pose", "settles", "still"),
+    "follow_through": ("follow-through", "follows through", "settles", "overshoot", "swings past"),
+    "overlapping": ("overlapping", "one after another", "lags behind"),
+    "secondary_motion": ("secondary motion", "hair", "cloth", "fabric", "trails", "swings"),
+}
+
+# Style families used to detect a style_bible contradiction in a video prompt.
+_ANIMATION_STYLE_WORDS = ("2d", "anime", "cartoon", "cel", "animation", "hand-drawn",
+                          "storybook illustration", "illustrated", "gouache", "watercolor")
+_PHOTOREAL_STYLE_WORDS = ("photorealistic", "photorealism", "live-action", "live action",
+                          "35mm anamorphic", "realistic skin", "skin pores")
+
+# --- Dialogue lint (P1) ------------------------------------------------------
+
+_WORDS_PER_SEC = 2.5  # natural spoken ceiling; lines that exceed this can't fit
+
+
+def _dialogue_line_words(line: str) -> list[str]:
+    return re.findall(r"[A-Za-z']+", line)
+
+
+def _is_placeholder_dialogue(content: str) -> bool:
+    """True when a <d> tag holds silence/punctuation, not speech."""
+    stripped = content.strip()
+    return not stripped or not _dialogue_line_words(stripped)
+
+
+def _bracketed_sounds(content: str) -> list[str]:
+    """Bracketed vocalizations inside a <d> tag, e.g. [Gasp!] in '[English] [Gasp!]'."""
+    # content is the inner text after the language tag
+    return re.findall(r"\[([A-Za-z][^\]]*)\]", content)
+
+
+def lint_dialogue_tag(content: str) -> list[str]:
+    """Per-tag lint for one <d>[Lang] content. Returns error messages."""
+    errs: list[str] = []
+    if _is_placeholder_dialogue(content):
+        errs.append(
+            f"empty/placeholder dialogue tag <d>…{content.strip()[:20]!r}…</d> — "
+            "silence is directed as 'diegetic_dialogue: None' plus a foley/ambience "
+            "beat, never an empty dialogue tag (H3 will try to speak it)"
+        )
+        return errs
+    sounds = _bracketed_sounds(content)
+    if sounds:
+        errs.append(
+            f"non-verbal sound(s) {sounds} inside a dialogue tag would be SPOKEN "
+            "literally — move vocalizations (gasp, sigh, laugh) to foley_and_sfx"
+        )
+    return errs
+
+
+# --- Voice Bible (P2) --------------------------------------------------------
+
+_VOICE_BIBLE_FIELDS = (
+    "voice_description",
+    "speech_pattern",
+    "signature_vocabulary",
+    "taboos",
+)
+
+# Two characters whose speech_pattern vectors overlap this much are not distinct.
+_VOICE_DISTINCT_OVERLAP = 0.6
+
+
+def parse_voice_bible(md: str) -> dict[str, Any]:
+    """Parse voice_bible.md -> {characters:{cid:{fields, samples, registers}}}."""
+    chars: dict[str, dict[str, Any]] = {}
+    cur: dict[str, Any] | None = None
+    cur_key = None
+    for raw in md.splitlines():
+        line = raw.strip()
+        m = re.match(r"^##\s+Character:\s*([A-Za-z0-9_]+)", line)
+        if m:
+            cur = {"fields": {}, "samples": [], "registers": {}}
+            chars[m.group(1).lower()] = cur
+            cur_key = None
+            continue
+        if cur is None or line.startswith("## "):
+            continue
+        low = line.lower()
+        if low.startswith("sample_lines:"):
+            cur_key = "samples"
+            continue
+        if low.startswith("registers:"):
+            cur_key = "registers"
+            continue
+        if cur_key == "samples":
+            if line.startswith("- "):
+                cur["samples"].append(line[2:].strip())
+            continue
+        if cur_key == "registers":
+            rm = re.match(r"toward_([A-Za-z0-9_]+)\s*:\s*(.*)", line)
+            if rm:
+                cur["registers"][rm.group(1).lower()] = rm.group(2).strip()
+            continue
+        for f in _VOICE_BIBLE_FIELDS:
+            if low.startswith(f + ":"):
+                cur["fields"][f] = line[len(f) + 1:].strip()
+                cur_key = None
+                break
+    return {"characters": chars}
+
+
+def validate_voice_bible(md: str, scenes: dict[str, Any] | None = None) -> ValidationResult:
+    res = ValidationResult()
+    data = parse_voice_bible(md)
+    chars = data["characters"]
+    if not chars:
+        res.error("voice_bible: no '## Character: <id>' entries parsed")
+        return res
+
+    cast_ids: set[str] = set()
+    if scenes and scenes.get("scenes"):
+        for sc in scenes["scenes"]:
+            for cid in sc.get("cast", []):
+                cast_ids.add(cid)
+
+    for cid, entry in chars.items():
+        for f in _VOICE_BIBLE_FIELDS:
+            if not entry["fields"].get(f):
+                res.error(f"voice_bible {cid}: missing '{f}:'")
+        if len(entry["samples"]) < 2:
+            res.warn(f"voice_bible {cid}: give at least 2 sample_lines")
+        for s in entry["samples"]:
+            inner = re.sub(r"^<d>\s*\[\w+\]\s*|\s*</d>$", "", s)
+            for e in lint_dialogue_tag(inner):
+                res.warn(f"voice_bible {cid}: sample line issue — {e}")
+        if cast_ids and cid not in cast_ids:
+            res.warn(f"voice_bible {cid}: not in any scene's cast")
+
+    # every cast character needs an entry
+    for cid in sorted(set(cast_ids) - set(chars)):
+        res.error(f"voice_bible: no entry for cast character {cid}")
+
+    # distinctness: identical speech patterns fail the cover-up-names test
+    patterns = {
+        cid: set(re.findall(r"[a-z']+", e["fields"].get("speech_pattern", "").lower()))
+        for cid, e in chars.items()
+        if e["fields"].get("speech_pattern")
+    }
+    ids = sorted(patterns)
+    for i in range(len(ids)):
+        for j in range(i + 1, len(ids)):
+            a, b = patterns[ids[i]], patterns[ids[j]]
+            if not a or not b:
+                continue
+            overlap = len(a & b) / max(len(a | b), 1)
+            if overlap >= _VOICE_DISTINCT_OVERLAP:
+                res.warn(
+                    f"voice_bible: {ids[i]} and {ids[j]} have near-identical "
+                    "speech_pattern — rewrite both until the cover-up-names test "
+                    "passes (hide the name; still know who speaks)"
+                )
+    return res
+
+
 # Per-shot `motion_profile:` — comma list of easing, cadence, and principle terms.
 # Terms with the `_easing` suffix group are mutually exclusive within a shot;
 # terms with the `_cadence` suffix group are mutually exclusive within a shot.
@@ -1307,18 +1496,23 @@ def is_directors_brief(text: str) -> bool:
     return bool(re.search(r"^\s*subject_definitions\s*:\s*Reference\b", text, re.M | re.I))
 
 
-def validate_video_prompt_brief(text: str, sb: dict[str, Any], gen_id: str) -> ValidationResult:
+def validate_video_prompt_brief(text: str, sb: dict[str, Any], gen_id: str,
+                                run_dir: str | None = None) -> ValidationResult:
     """Validate a Director's Brief format video prompt against the storyboard.
 
     Format structure:
     - subject_definitions:Reference header
-    - Identity statements ("Maintain the exact appearance of...")
+    - Identity anchors ("Maintain the exact appearance of...")
     - Preamble with style & quality declarations (no prohibited brand names)
     - Optional g2+ continuation statement
     - Timeline section header
     - Contiguous SHOT blocks with timestamps (SHOT N — start–ends (Continuous Shot))
-    - Dedicated Audio: line per shot
+    - Dedicated 4-layer Audio: block per shot
     - Dialogue formatting with speaker IDs
+
+    Quality checks (P1): panel-reference ban, 4-layer audio, subject-definition
+    word budget, single camera motion per shot, style_bible consistency,
+    per-second density, and motion_profile translation.
     """
     res = ValidationResult()
     eps = 0.15
@@ -1361,9 +1555,56 @@ def validate_video_prompt_brief(text: str, sb: dict[str, Any], gen_id: str) -> V
     timeline_text = text[timeline_start:]
     preamble_text = text[:timeline_match.start()]
 
-    # Check for identity descriptions in preamble
-    if "maintain the exact appearance" not in preamble_text.lower():
-        res.warn("preamble should include 'Maintain the exact appearance of [Character]: ...' identity descriptions")
+    # Check for identity anchors in preamble
+    if "maintain the exact appearance" not in preamble_text.lower() \
+            and "identity anchor" not in preamble_text.lower():
+        res.warn(
+            "preamble should include per-character identity anchors "
+            "(e.g. 'Maintain the exact appearance of [Character]: <signature traits>')"
+        )
+
+    # Subject-definition word budget: the reference image carries identity, so
+    # re-describing wardrobe in full burns attention H3 needs for motion/camera.
+    for m in re.finditer(r"^.*maintain the exact appearance of.*$", preamble_text,
+                         re.MULTILINE | re.IGNORECASE):
+        para_words = len(m.group(0).split())
+        name_m = re.search(r"appearance of\s+([^:,]+)", m.group(0), re.IGNORECASE)
+        who = (name_m.group(1).strip() if name_m else "a character")[:40]
+        if para_words > 120:
+            res.error(
+                f"identity anchor for {who!r} is {para_words} words — the storyboard "
+                "reference image carries identity; keep the anchor to <=60 words "
+                "(name + 2-3 signature traits) and direct only motion, acting, "
+                "camera, lighting, and audio"
+            )
+        elif para_words > 60:
+            res.warn(
+                f"identity anchor for {who!r} is {para_words} words; "
+                "trim toward <=60 (name + 2-3 signature traits)"
+            )
+
+    # Style consistency against the episode's style_bible (when present).
+    if run_dir:
+        bible_path = os.path.join(run_dir, "style_bible.md")
+        if os.path.isfile(bible_path):
+            bible = parse_style_bible(open(bible_path, encoding="utf-8").read())
+            target = (bible.get("fields", {}).get("production_target") or "").lower()
+            lower_text = text.lower()
+            bible_is_animation = any(w in target for w in _ANIMATION_STYLE_WORDS)
+            bible_is_photoreal = any(w in target for w in _PHOTOREAL_STYLE_WORDS)
+            prompt_is_photoreal = any(w in lower_text for w in _PHOTOREAL_STYLE_WORDS)
+            prompt_is_animation = any(w in lower_text for w in _ANIMATION_STYLE_WORDS)
+            if bible_is_animation and not bible_is_photoreal and prompt_is_photoreal:
+                res.error(
+                    "prompt style contradicts style_bible.production_target "
+                    f"({target[:60]!r}): it declares photoreal/live-action styling. "
+                    "Keep every generation in the episode's locked style family."
+                )
+            elif bible_is_photoreal and not bible_is_animation and prompt_is_animation:
+                res.error(
+                    "prompt style contradicts style_bible.production_target "
+                    f"({target[:60]!r}): it declares animation/illustration styling."
+                )
 
     # g2+ continuation check
     gen_index = next(
@@ -1388,6 +1629,9 @@ def validate_video_prompt_brief(text: str, sb: dict[str, Any], gen_id: str) -> V
 
     gen_start = gen.get("start") or 0.0
     gen_dur = (gen.get("end") or 0.0) - gen_start
+
+    # Dialogue lines per shot, for lint (duplicates, repetition, word-rate, ranking)
+    shot_dialogues: list[tuple[int, float, float, list[str]]] = []
 
     # Validate shot ranges and extract shot bodies
     prev_end = 0.0
@@ -1431,14 +1675,137 @@ def validate_video_prompt_brief(text: str, sb: dict[str, Any], gen_id: str) -> V
         body_end = shot_headers[i + 1].start() if i + 1 < len(shot_headers) else len(timeline_text)
         shot_body = timeline_text[body_start:body_end]
 
-        # Check for Audio line in shot body
-        if not re.search(r"^\s*Audio\s*:", shot_body, re.MULTILINE | re.IGNORECASE):
-            res.error(f"SHOT {s_num} missing an 'Audio:' line for Foley/sound/dialogue direction")
+        # --- P1 quality checks per shot ---
+
+        # 1. Panel-reference ban: shot prose must describe the scene, not the board.
+        panel_ref = _PANEL_REF_RE.search(shot_body)
+        if panel_ref:
+            res.error(
+                f"SHOT {s_num}: references the storyboard by panel number "
+                f"({panel_ref.group(0)!r}) — describe the cinematic scene directly; "
+                "all timing lives in the prompt, never in panel references"
+            )
+
+        # 2. 4-layer audio contract.
+        audio_m = re.search(r"^\s*Audio\s*:\s*(.*)$", shot_body, re.MULTILINE | re.IGNORECASE)
+        if not audio_m:
+            res.error(f"SHOT {s_num} missing an 'Audio:' block for Foley/sound/dialogue direction")
+        else:
+            audio_block = shot_body[audio_m.start():]
+            missing_layers = [l for l in _VIDEO_AUDIO_LAYERS if l not in audio_block.lower()]
+            if missing_layers:
+                res.error(
+                    f"SHOT {s_num}: Audio block is missing layer(s) {missing_layers} — "
+                    "use the 4-layer hierarchy (diegetic_dialogue, foley_and_sfx, "
+                    "environmental_ambience, non_diegetic_music)"
+                )
+
+        # 2b. Dialogue lint for this shot: empty tags, spoken vocalizations,
+        #     word-rate fit, dialogue-forward ranking.
+        lines: list[str] = []
+        for dm in _DIALOGUE_RE.finditer(shot_body):
+            content = dm.group(2)
+            for e in lint_dialogue_tag(content):
+                res.error(f"SHOT {s_num}: {e}")
+            if not _is_placeholder_dialogue(content):
+                lines.append(" ".join(_dialogue_line_words(content)).lower())
+        shot_dialogues.append((s_num, start, end, lines))
+        shot_words = sum(len(_dialogue_line_words(l)) for l in lines)
+        if shot_words and (end - start) > 0:
+            if shot_words / (end - start) > _WORDS_PER_SEC:
+                res.error(
+                    f"SHOT {s_num}: {shot_words} spoken words in {end - start:.1f}s exceeds "
+                    f"~{_WORDS_PER_SEC} words/sec — shorten the line or extend the shot"
+                )
+            if audio_m:
+                ab = shot_body[audio_m.start():].lower()
+                if "dialogue forward" not in ab and "voice forward" not in ab \
+                        and "dialogue-forward" not in ab and "voice-forward" not in ab:
+                    res.warn(
+                        f"SHOT {s_num}: dialogue present but the Audio block never ranks it "
+                        "(e.g. 'dialogue forward, faint ambience') — H3 may bury the voice"
+                    )
+
+        # 3. Single motion path: one camera idea per shot (or explicit primitives).
+        camera_sentences = re.findall(r"[^.!?]*\bcamera\b[^.!?]*[.!?]", shot_body, re.IGNORECASE)
+        for sentence in camera_sentences:
+            hits = {k for k in _CAMERA_MOTION_KEYWORDS if k in sentence.lower()}
+            # a deliberately decomposed move ("truck left + pan right") is fine
+            if "+" in sentence:
+                continue
+            if any(hits == pair or hits <= pair for pair in _CAMERA_BENIGN_PAIRS):
+                continue
+            if len(hits) > 1:
+                res.warn(
+                    f"SHOT {s_num}: camera sentence stacks multiple motions {sorted(hits)} — "
+                    "commit to one motion path, or decompose explicitly into primitives "
+                    "(e.g. 'truck left + pan right')"
+                )
+
+        # 4. Per-second density for longer shots (H3 visual process description).
+        shot_dur = end - start
+        if shot_dur > 4.0:
+            # action prose only — exclude the trailing Audio block entirely
+            prose = shot_body[:audio_m.start()] if audio_m else shot_body
+            sentences = [s for s in re.split(r"(?<=[.!?])\s+", prose.strip()) if len(s.split()) > 3]
+            if len(sentences) < 2:
+                res.warn(
+                    f"SHOT {s_num} runs {shot_dur:.1f}s but has {len(sentences)} action "
+                    "sentence(s) — describe what happens at each second of the shot "
+                    "(H3 guidance: visual process description, not a single flat beat)"
+                )
+
+        # 5. motion_profile translation from the storyboard.
+        sb_shot = sb_shots[i] if i < len(sb_shots) else {}
+        for term in (sb_shot.get("motion_profile") or []):
+            phrases = _MOTION_PROFILE_PHRASES.get(term)
+            if not phrases:
+                continue
+            if not any(p in shot_body.lower() for p in phrases):
+                res.warn(
+                    f"SHOT {s_num}: storyboard declares motion_profile '{term}' but the "
+                    f"prompt never expresses it — add phrasing such as "
+                    f"{', '.join(repr(p) for p in phrases[:3])}"
+                )
 
     if shot_headers:
         last_end = float(shot_headers[-1].group(3))
         if abs(last_end - gen_dur) > eps:
             res.error(f"last SHOT ends at {last_end:.1f}s, generation duration is {gen_dur:.1f}s")
+
+    # --- Aggregate dialogue lint across the generation ---
+
+    # Duplicate line within a generation (prose + audio block, or two shots).
+    seen: dict[str, int] = {}
+    for s_num, _s, _e, lines in shot_dialogues:
+        for ln in lines:
+            if ln in seen:
+                res.error(
+                    f"SHOT {s_num}: dialogue line {ln[:60]!r} already used in SHOT "
+                    f"{seen[ln]} — give each line one canonical placement (the Audio "
+                    "block), never repeat it"
+                )
+            else:
+                seen[ln] = s_num
+
+    # Cross-cut anti-repetition: near-identical lines in adjacent shots
+    # (the "He broke it! / No! He broke it!" pattern).
+    for j in range(1, len(shot_dialogues)):
+        s_num, _, _, lines = shot_dialogues[j]
+        prev_num, _, _, prev_lines = shot_dialogues[j - 1]
+        for ln in lines:
+            words = set(ln.split())
+            if len(words) < 2:
+                continue
+            for pl in prev_lines:
+                overlap = len(words & set(pl.split())) / max(len(words | set(pl.split())), 1)
+                if overlap >= 0.6:
+                    res.warn(
+                        f"SHOT {s_num}: line {ln[:60]!r} near-repeats SHOT {prev_num} "
+                        f"({pl[:60]!r}) — apply the anti-repetition gate: pivot to a "
+                        "plea, bargain, or new information instead of restating"
+                    )
+                    break
 
     # Dialogue tags check
     for m in _DIALOGUE_RE.finditer(text):
@@ -1448,6 +1815,12 @@ def validate_video_prompt_brief(text: str, sb: dict[str, Any], gen_id: str) -> V
         pre = text[max(0, m.start() - 220):m.start()]
         if not re.search(r"\((?:S\d+,?)+\)", pre) and not re.search(r"\b(?:S\d+)\b", pre):
             res.error("dialogue must attribute a speaker ID like (S1) before each <d> tag")
+        if "voiceover" in pre.lower():
+            if "says in an off-screen voiceover" not in pre:
+                res.error("voiceover must use the exact phrase 'says in an off-screen voiceover'")
+            post = text[m.end():m.end() + 160].lower()
+            if "lips remain" not in post or "closed" not in post:
+                res.error("voiceover must state that the on-screen character's lips remain closed")
 
     # Prompt stuffing patterns warning
     for pat in _PROMPT_STUFFING_PATTERNS:
@@ -1458,26 +1831,27 @@ def validate_video_prompt_brief(text: str, sb: dict[str, Any], gen_id: str) -> V
                 "best to natural descriptive prose rather than prompt-stuffing tags"
             )
 
-    # Word count check on Timeline
+    # Word count check on Timeline (H3 guidance: 350-500 words for Context-IR).
     timeline_words = len(timeline_text.split())
-    if timeline_words < 120:
+    if timeline_words < 300:
         res.warn(
             f"Timeline has {timeline_words} words; optimal depth for MiniMax H3 is "
-            "350-500 words to guide Context-IR"
+            "350-500 words to guide Context-IR — add per-second visual process detail"
         )
-    elif timeline_words > 650:
+    elif timeline_words > 600:
         res.warn(
-            f"Timeline has {timeline_words} words; exceeding ~500-600 words may dilute "
-            "temporal conditioning focus"
+            f"Timeline has {timeline_words} words; exceeding ~500 words dilutes "
+            "temporal conditioning focus — cut adjectives, keep motion and audio"
         )
 
     return res
 
 
-def validate_video_prompt(text: str, sb: dict[str, Any], gen_id: str) -> ValidationResult:
+def validate_video_prompt(text: str, sb: dict[str, Any], gen_id: str,
+                          run_dir: str | None = None) -> ValidationResult:
     """Validate a video prompt (Ref2VA or Director's Brief) against the storyboard."""
     if is_directors_brief(text):
-        return validate_video_prompt_brief(text, sb, gen_id)
+        return validate_video_prompt_brief(text, sb, gen_id, run_dir=run_dir)
 
     res = ValidationResult()
     eps = 0.15
@@ -2286,6 +2660,12 @@ def validate(artifact_path: str, schema: str, *, target_seconds: int | None = No
         if sp and os.path.isfile(sp):
             scenes = parse_scenes(open(sp, encoding="utf-8").read())
         return validate_style_bible(text, scenes=scenes)
+    if schema == "voice_bible":
+        scenes = None
+        sp = scenes_path or (os.path.join(run_dir, "scenes.md") if run_dir else None)
+        if sp and os.path.isfile(sp):
+            scenes = parse_scenes(open(sp, encoding="utf-8").read())
+        return validate_voice_bible(text, scenes=scenes)
     if schema == "sound_map":
         scenes = None
         sp = scenes_path or (os.path.join(run_dir, "scenes.md") if run_dir else None)
@@ -2328,7 +2708,7 @@ def validate(artifact_path: str, schema: str, *, target_seconds: int | None = No
         sb = parse_storyboard(open(sb_md_path, encoding="utf-8").read())
         if legacy:
             return validate_video_prompt_legacy(text, sb, gid)
-        return validate_video_prompt(text, sb, gid)
+        return validate_video_prompt(text, sb, gid, run_dir=run_dir)
     if schema == "spatial_plan":
         from .spatial_validator import validate_spatial_plan
         sb = None

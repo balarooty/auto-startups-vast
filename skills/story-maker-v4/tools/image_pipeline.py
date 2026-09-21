@@ -530,16 +530,31 @@ def image_prompts_dir(run_dir: str) -> str:
     return os.path.join(run_dir, "image_prompts")
 
 
+def _resolve_asset_prompt_path(run_dir: str, category: str, asset_id: str) -> str:
+    # ponytail: check episode-local prompt first, fall back to universal story assets
+    local_path = os.path.join(image_prompts_dir(run_dir), category, f"{asset_id}.txt")
+    if os.path.isfile(local_path):
+        return local_path
+    parent_dir = os.path.dirname(run_dir)
+    assets_path = os.path.join(parent_dir, "assets", "image_prompts", category, f"{asset_id}.txt")
+    if os.path.isfile(assets_path):
+        return assets_path
+    story_prompts_path = os.path.join(parent_dir, "image_prompts", category, f"{asset_id}.txt")
+    if os.path.isfile(story_prompts_path):
+        return story_prompts_path
+    return local_path
+
+
 def character_prompt_path(run_dir: str, cid: str) -> str:
-    return os.path.join(image_prompts_dir(run_dir), "characters", f"{cid}.txt")
+    return _resolve_asset_prompt_path(run_dir, "characters", cid)
 
 
 def location_prompt_path(run_dir: str, lid: str) -> str:
-    return os.path.join(image_prompts_dir(run_dir), "locations", f"{lid}.txt")
+    return _resolve_asset_prompt_path(run_dir, "locations", lid)
 
 
 def object_prompt_path(run_dir: str, oid: str) -> str:
-    return os.path.join(image_prompts_dir(run_dir), "objects", f"{oid}.txt")
+    return _resolve_asset_prompt_path(run_dir, "objects", oid)
 
 
 def sheet_prompt_path(run_dir: str, scene_id: str, gen_id: str | None = None) -> str:

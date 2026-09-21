@@ -89,6 +89,39 @@ def _find_sheet(run_dir: str, scene_id: str, gen_id: str) -> str:
     )
 
 
+def _find_voice_refs(run_dir: str, gen: dict) -> list[str] | None:
+    """Find per-character voice-reference clips for a generation (P4).
+
+    Voice clips live in the story-level shared assets dir: ``<run_dir>/../assets/
+    voices/<cid>.<ext>`` — one clip per character whose voice should stay locked
+    across generations. Only characters who actually speak in this generation
+    (non-empty ``dialogue:`` on any shot) are attached, one clip each.
+    """
+    if not getattr(config, "VOICE_REFS_ENABLED", True):
+        return None
+    assets_dir = os.path.join(os.path.dirname(os.path.abspath(run_dir)), "assets", "voices")
+    if not os.path.isdir(assets_dir):
+        return None
+    speaking: list[str] = []
+    for shot in gen.get("shots", []):
+        dlg = (shot.get("dialogue") or "").strip()
+        if not dlg or dlg.lower() in ("none", "no", "no dialogue"):
+            continue
+        # speakers are the cids named before each colon: `cid: "line", cid2: "..."`
+        for m in re.finditer(r"([A-Za-z][A-Za-z0-9_]*)\s*:", dlg):
+            cid = m.group(1)
+            if cid not in speaking:
+                speaking.append(cid)
+    refs: list[str] = []
+    for cid in speaking:
+        for ext in ("wav", "mp3", "m4a", "aac", "flac", "ogg"):
+            p = os.path.join(assets_dir, f"{cid}.{ext}")
+            if _exists(p):
+                refs.append(p)
+                break
+    return refs or None
+
+
 def _find_audio_ref(run_dir: str, scene_id: str, gen_id: str) -> list[str] | None:
     """Find optional audio reference attachment for a generation."""
     audio_dir = os.path.join(run_dir, "audio")
@@ -155,8 +188,14 @@ def _render_clip(
                 break
 
     extra_audio_refs = _find_audio_ref(run_dir, scene_id, gid)
+    # P4: per-character voice anchors (same timbre across generations), then any
+    # generation-level audio ref from the run dir.
+    voice_refs = _find_voice_refs(run_dir, gen)
+    if voice_refs:
+        extra_audio_refs = list(voice_refs) + list(extra_audio_refs or [])
     duration = (gen["end"] or 0.0) - (gen["start"] or 0.0)
-    print(f"  clip {scene_id}/{gid}: rendering ({duration:.1f}s, audio_ref={'yes' if extra_audio_refs else 'no'}) ...")
+    audio_src = "voice" if voice_refs else ("run" if extra_audio_refs else "no")
+    print(f"  clip {scene_id}/{gid}: rendering ({duration:.1f}s, audio_ref={audio_src}) ...")
     result = render_generation(
         sheet_path=sheet_path,
         prompt=prompt,

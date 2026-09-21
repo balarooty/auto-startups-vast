@@ -2,12 +2,12 @@
 
 > Authored by Agent 3 (Storyboard Planner), one per generation
 > (`timing_sheet_<scene>_g<gen>.md`). This is the X-sheet analogue: it maps the
-> generation's 5–20s to **0.5s rows** of dialogue-phoneme cues, action keys,
+> generation's 5–15s to **0.5s rows** of dialogue-phoneme cues, action keys,
 > camera keys, and sound keys. Agent 5 compiles it into the Ref2VA prompt's
 > `detailed_description` timeline. Validate:
 > `python3 scripts/validate.py timing_sheet_<scene>_g<gen>.md --schema timing_sheet --run-dir <run_dir>`
 
-duration_seconds: <this generation's duration, 5.0–20.0>
+duration_seconds: <this generation's duration, 5.0–15.0>
 
 | time | dialogue | action | camera | sound |
 |------|----------|--------|--------|-------|
